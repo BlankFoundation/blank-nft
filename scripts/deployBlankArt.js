@@ -1,6 +1,6 @@
 async function main() {
   const BlankArt = await ethers.getContractFactory("BlankArt")
-  const blankArt = await BlankArt.deploy("BlankArt", "BLANK", 10000, ethers.);
+  const blankArt = await BlankArt.deploy("BlankArt", "BLANK", 10000, "0x0000000000000000000000000000000000000000");
 
   // Start deployment, returning a promise that resolves to a contract object
   await blankNFT.deployed();
