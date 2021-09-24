@@ -1,26 +1,17 @@
-pragma solidity ^0.5.12;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.2;
 
 import "./ERC721.sol";
 import "./ERC721Enumerable.sol";
 import "./ERC721Metadata.sol";
 
-contract BlankArt is
-    Initializable,
-    ERC721,
-    ERC721Enumerable,
-    ERC721Metadata
-{
-
+contract BlankArt is Initializable, ERC721, ERC721Enumerable, ERC721Metadata {
     // An event whenever the foundation address is updated
     event FoundationAddressUpdated(address foundationAddress);
 
-    event MemberAdded(
-        address member
-    );
+    event MemberAdded(address member);
 
-    event MemberRevoked(
-        address member
-    );
+    event MemberRevoked(address member);
 
     // if a token's URI has been locked or not
     mapping(uint256 => bool) public tokenURILocked;
@@ -108,8 +99,8 @@ contract BlankArt is
 
     // Allows the current foundation address to update to something different
     function updateFoundationAddress(address payable newFoundationAddress)
-    external
-    onlyFoundation
+        external
+        onlyFoundation
     {
         foundationAddress = newFoundationAddress;
 
@@ -118,8 +109,8 @@ contract BlankArt is
 
     // Allow the foundation to update a token's URI if it's not locked yet (for updating art post mint)
     function updateTokenURI(uint256 tokenId, string calldata tokenURI)
-    external
-    onlyFoundation
+        external
+        onlyFoundation
     {
         // ensure that this token exists
         require(_exists(tokenId));
@@ -137,12 +128,7 @@ contract BlankArt is
         tokenURILocked[tokenId] = true;
     }
 
-    function mintBlank(
-        uint256 tokenId
-    )
-    external
-    onlyMembers(msg.sender)
-    {
+    function mintBlank(uint256 tokenId) external onlyMembers(msg.sender) {
         // Mint the token
         super._safeMint(msg.sender, tokenId);
     }
