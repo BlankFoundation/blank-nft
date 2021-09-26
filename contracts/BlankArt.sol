@@ -23,6 +23,10 @@ contract BlankArt is Initializable, ERC721, ERC721Enumerable, ERC721Metadata {
     address payable public foundationAddress;
     // If an account can mint
     mapping(address => bool) private _members;
+    // Number of tokens minted by account
+    mapping(address => uint8) private _memberMintCount;
+    // Max number of tokens a member can mint
+    uint8 public memberMaxMintCount;
 
     function setup(
         string memory name,
@@ -36,6 +40,9 @@ contract BlankArt is Initializable, ERC721, ERC721Enumerable, ERC721Metadata {
 
         // royalty amounts to the foundation
         foundationSalePercentage = 20;
+
+        // max amount of nfts a member can mint
+        memberMaxMintCount = 5;
 
         // by default, the foundationAddress is the address that mints this contract
         foundationAddress = msg.sender;
@@ -79,13 +86,34 @@ contract BlankArt is Initializable, ERC721, ERC721Enumerable, ERC721Metadata {
         }
     }
 
+    function _checkMemberMintCount(address account)
+        internal
+        view
+        isMember(address)
+    {
+        if (_memberMintCount[account] >= memberMaxMintCount) {
+            revert(
+                string(
+                    abi.encodePacked(
+                        "Account ",
+                        Strings.toHexString(uint160(account), 20),
+                        " has reached its minting limit of ",
+                        memberMaxMintCount,
+                        ", so cannot mint"
+                    )
+                )
+            );
+        }
+    }
+
     function addMember(address account) public virtual override onlyFoundation {
         _addMember(account);
     }
 
-    function _addMember(bytes32 role, address account) internal virtual {
+    function _addMember(address account) internal virtual {
         if (!isMember(account)) {
             _members[account] = true;
+            _memberMintCount[account] = 0;
             emit MemberAdded(account, msg.sender);
         }
     }
@@ -120,6 +148,19 @@ contract BlankArt is Initializable, ERC721, ERC721Enumerable, ERC721Metadata {
         super._setTokenURI(tokenId, tokenURI);
     }
 
+    // Allow the foundation to update a token's URI if it's not locked yet (for updating art post mint)
+    function updateTokenURI(uint256 tokenId, string calldata tokenURI)
+        external
+        onlyFoundation
+    {
+        // ensure that this token exists
+        require(_exists(tokenId));
+        // ensure that the URI for this token is not locked yet
+        require(tokenURILocked[tokenId] == false);
+        // update the token URI
+        super._setTokenURI(tokenId, tokenURI);
+    }
+
     // Locks a token's URI from being updated
     function lockTokenURI(uint256 tokenId) external onlyFoundation {
         // ensure that this token exists
@@ -129,8 +170,12 @@ contract BlankArt is Initializable, ERC721, ERC721Enumerable, ERC721Metadata {
     }
 
     function mintBlank(uint256 tokenId) external onlyMembers(msg.sender) {
-        // Mint the token
-        super._safeMint(msg.sender, tokenId);
+        // Check that the member has not reached their max mint count
+        if (_checkMemberMintCount(msg.sender)) {
+            // Mint the token
+            super._safeMint(msg.sender, tokenId);
+            _memberMintCount[msg.sender]++;
+        }
     }
 
     // override the default transfer
