@@ -99,10 +99,22 @@ contract BlankArt is
         }
     }
 
+    function addMembersBatch(address[] memory accounts) public virtual override onlyFoundation {
+        for (uint256 account = 0; account < accounts.length; account++) {
+            addMember(accounts[account]);
+        }
+    }
+
     function revokeMember(address account) internal virtual {
         if (isMember(account)) {
             _members[account] = false;
             emit MemberRevoked(account, msg.sender);
+        }
+    }
+
+    function revokeMembersBatch(address[] memory accounts) public virtual override onlyFoundation {
+        for (uint256 account = 0; account < accounts.length; account++) {
+            revokeMember(accounts[account]);
         }
     }
 
