@@ -53,7 +53,10 @@ contract BlankArt is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
 
     // modifier for only allowing the foundation to make a call
     modifier onlyFoundation() {
-        require(msg.sender == foundationAddress);
+        require(
+            msg.sender == foundationAddress,
+            "Only the foundation can make this call"
+        );
         _;
     }
 
@@ -110,7 +113,7 @@ contract BlankArt is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
         }
     }
 
-    function revokeMember(address account) internal virtual {
+    function revokeMember(address account) public virtual onlyFoundation {
         if (isMember(account)) {
             _members[account] = false;
             emit MemberRevoked(account);
