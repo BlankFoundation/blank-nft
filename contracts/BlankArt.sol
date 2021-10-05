@@ -1,29 +1,22 @@
-pragma solidity ^0.5.12;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.2;
 
-import "./ERC721.sol";
-import "./ERC721Enumerable.sol";
-import "./ERC721Metadata.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 
-contract BlankArt is
-    Initializable,
-    ERC721,
-    ERC721Enumerable,
-    ERC721Metadata
-{
-
+contract BlankArt is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
     // An event whenever the foundation address is updated
     event FoundationAddressUpdated(address foundationAddress);
 
-    event MemberAdded(
-        address member
-    );
+    event MemberAdded(address member);
 
-    event MemberRevoked(
-        address member
-    );
+    event MemberRevoked(address member);
 
     // if a token's URI has been locked or not
     mapping(uint256 => bool) public tokenURILocked;
+
     // the percentage of sale that the foundation gets on secondary sales
     uint256 public foundationSalePercentage;
     // gets incremented to placehold for tokens not minted yet
@@ -33,34 +26,37 @@ contract BlankArt is
     // If an account can mint
     mapping(address => bool) private _members;
 
-    function setup(
-        string memory name,
-        string memory symbol,
-        uint256 initialExpectedTokenSupply,
-        address _upgraderAddress
-    ) public initializer {
-        ERC721.initialize();
-        ERC721Enumerable.initialize();
-        ERC721Metadata.initialize(name, symbol);
-
-        // royalty amounts to the foundation
-        foundationSalePercentage = 20;
-
-        // by default, the foundationAddress is the address that mints this contract
-        foundationAddress = msg.sender;
-
-        // set the upgrader address
-        upgraderAddress = _upgraderAddress;
-
-        // set the initial expected token supply
+    constructor(uint256 initialExpectedTokenSupply)
+        ERC721("BlankArt", "BLANK")
+    {
+        foundationSalePercentage = 50;
+        foundationAddress = payable(msg.sender);
+        _members[msg.sender] = true;
         expectedTokenSupply = initialExpectedTokenSupply;
-
         require(expectedTokenSupply > 0);
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId
+    ) internal override(ERC721, ERC721Enumerable) {
+        super._beforeTokenTransfer(from, to, tokenId);
+    }
+
+    function _burn(uint256 tokenId)
+        internal
+        override(ERC721, ERC721URIStorage)
+    {
+        super._burn(tokenId);
     }
 
     // modifier for only allowing the foundation to make a call
     modifier onlyFoundation() {
-        require(msg.sender == foundationAddress);
+        require(
+            msg.sender == foundationAddress,
+            "Only the foundation can make this call"
+        );
         _;
     }
 
@@ -70,7 +66,25 @@ contract BlankArt is
         _;
     }
 
-    function isMember(address account) public view override returns (bool) {
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        override(ERC721, ERC721URIStorage)
+        returns (string memory)
+    {
+        return super.tokenURI(tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721Enumerable)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
+    function isMember(address account) public view returns (bool) {
         return _members[account];
     }
 
@@ -88,31 +102,39 @@ contract BlankArt is
         }
     }
 
-    function addMember(address account) public virtual override onlyFoundation {
+    function addMember(address account) public virtual onlyFoundation {
         _addMember(account);
     }
 
-    function _addMember(bytes32 role, address account) internal virtual {
+    function _addMember(address account) internal virtual {
         if (!isMember(account)) {
             _members[account] = true;
-            emit MemberAdded(account, msg.sender);
+            emit MemberAdded(account);
         }
     }
 
-    function addMembersBatch(address[] memory accounts) public virtual override onlyFoundation {
+    function addMembersBatch(address[] memory accounts)
+        public
+        virtual
+        onlyFoundation
+    {
         for (uint256 account = 0; account < accounts.length; account++) {
             addMember(accounts[account]);
         }
     }
 
-    function revokeMember(address account) internal virtual {
+    function revokeMember(address account) public virtual onlyFoundation {
         if (isMember(account)) {
             _members[account] = false;
-            emit MemberRevoked(account, msg.sender);
+            emit MemberRevoked(account);
         }
     }
 
-    function revokeMembersBatch(address[] memory accounts) public virtual override onlyFoundation {
+    function revokeMembersBatch(address[] memory accounts)
+        public
+        virtual
+        onlyFoundation
+    {
         for (uint256 account = 0; account < accounts.length; account++) {
             revokeMember(accounts[account]);
         }
@@ -120,8 +142,8 @@ contract BlankArt is
 
     // Allows the current foundation address to update to something different
     function updateFoundationAddress(address payable newFoundationAddress)
-    external
-    onlyFoundation
+        external
+        onlyFoundation
     {
         foundationAddress = newFoundationAddress;
 
@@ -129,16 +151,16 @@ contract BlankArt is
     }
 
     // Allow the foundation to update a token's URI if it's not locked yet (for updating art post mint)
-    function updateTokenURI(uint256 tokenId, string calldata tokenURI)
-    external
-    onlyFoundation
+    function updateTokenURI(uint256 tokenId, string calldata newTokenURI)
+        external
+        onlyFoundation
     {
         // ensure that this token exists
         require(_exists(tokenId));
         // ensure that the URI for this token is not locked yet
         require(tokenURILocked[tokenId] == false);
         // update the token URI
-        super._setTokenURI(tokenId, tokenURI);
+        super._setTokenURI(tokenId, newTokenURI);
     }
 
     // Locks a token's URI from being updated
@@ -149,23 +171,8 @@ contract BlankArt is
         tokenURILocked[tokenId] = true;
     }
 
-    function mintBlank(
-        uint256 tokenId
-    )
-    external
-    onlyMembers(msg.sender)
-    {
+    function mintBlank(uint256 tokenId) external onlyMembers {
         // Mint the token
         super._safeMint(msg.sender, tokenId);
-    }
-
-    // override the default transfer
-    function _transferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) internal {
-        // transfer the token
-        super._transferFrom(from, to, tokenId);
     }
 }
