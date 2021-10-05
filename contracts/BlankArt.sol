@@ -25,11 +25,16 @@ contract BlankArt is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
     address payable public foundationAddress;
     // If an account can mint
     mapping(address => bool) private _members;
+    // Number of tokens minted by account
+    mapping(address => uint8) private _memberMintCount;
+    // Max number of tokens a member can mint
+    uint8 public memberMaxMintCount;
 
     constructor(uint256 initialExpectedTokenSupply)
         ERC721("BlankArt", "BLANK")
     {
         foundationSalePercentage = 50;
+        memberMaxMintCount = 5;
         foundationAddress = payable(msg.sender);
         _members[msg.sender] = true;
         expectedTokenSupply = initialExpectedTokenSupply;
@@ -102,6 +107,22 @@ contract BlankArt is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
         }
     }
 
+    function _checkMemberMintCount(address account) internal view onlyMembers {
+        if (_memberMintCount[account] >= memberMaxMintCount) {
+            revert(
+                string(
+                    abi.encodePacked(
+                        "Account ",
+                        Strings.toHexString(uint160(account), 20),
+                        " has reached its minting limit of ",
+                        memberMaxMintCount,
+                        ", so cannot mint"
+                    )
+                )
+            );
+        }
+    }
+
     function addMember(address account) public virtual onlyFoundation {
         _addMember(account);
     }
@@ -109,6 +130,7 @@ contract BlankArt is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
     function _addMember(address account) internal virtual {
         if (!isMember(account)) {
             _members[account] = true;
+            _memberMintCount[account] = 0;
             emit MemberAdded(account);
         }
     }
@@ -174,5 +196,6 @@ contract BlankArt is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
     function mintBlank(uint256 tokenId) external onlyMembers {
         // Mint the token
         super._safeMint(msg.sender, tokenId);
+        _memberMintCount[msg.sender]++;
     }
 }
