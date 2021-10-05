@@ -113,10 +113,30 @@ contract BlankArt is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
         }
     }
 
+    function addMembersBatch(address[] memory accounts)
+        public
+        virtual
+        onlyFoundation
+    {
+        for (uint256 account = 0; account < accounts.length; account++) {
+            addMember(accounts[account]);
+        }
+    }
+
     function revokeMember(address account) public virtual onlyFoundation {
         if (isMember(account)) {
             _members[account] = false;
             emit MemberRevoked(account);
+        }
+    }
+
+    function revokeMembersBatch(address[] memory accounts)
+        public
+        virtual
+        onlyFoundation
+    {
+        for (uint256 account = 0; account < accounts.length; account++) {
+            revokeMember(accounts[account]);
         }
     }
 
