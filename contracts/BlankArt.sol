@@ -157,6 +157,8 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
         // make sure that the signer is the foundation address
         require(payable(signer) == foundationAddress, "Signature invalid or unauthorized");
 
+        require(amount <= memberMaxMintCount, "Amount is more than the minting limit");
+
         // make sure that the redeemer is paying enough to cover the buyer's cost
         require(msg.value >= (voucher.minPrice * amount), "Insufficient funds to redeem");
 

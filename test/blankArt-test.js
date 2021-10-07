@@ -35,6 +35,28 @@ describe("BlankArt", function () {
       .and.to.emit(contract, 'Transfer') // transfer from minter to redeemer
       //.withArgs(minter.address, redeemer.address, contract.tokenIndex - 1);
   });
+  it("Should redeem 5 free Blank NFTs from a signed voucher", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher()
+
+    await expect(redeemerContract.redeemVoucher(redeemer.address, 5, voucher))
+      .to.emit(contract, 'Transfer')  // transfer from null address to minter
+      //.withArgs('0x0000000000000000000000000000000000000000', minter.address, contract.tokenIndex - 1)
+      .and.to.emit(contract, 'Transfer') // transfer from minter to redeemer
+      //.withArgs(minter.address, redeemer.address, contract.tokenIndex - 1);
+  });
+  it("Should error on an attempt to mint more than 5 Blank NFTs from a signed voucher", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher()
+
+    const amount = 6;
+    await expect(redeemerContract.redeemVoucher(redeemer.address, amount, voucher))
+      .to.be.revertedWith("Amount is more than the minting limit");
+  });
 
   it("should allow you to check membership if an address has minted", async () => {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
@@ -122,38 +144,32 @@ describe("BlankArt", function () {
     // minter should now have zero available
     expect(await contract.availableToWithdraw()).to.equal(0)
   })
+  it("should allow you to update the foundation address", async () => {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
 
+    expect(await contract.foundationAddress()).to.equal(minter.address);
 
-//  it("should allow you to update the foundation address", async () => {
-//    const [_owner, addr1] = await ethers.getSigners();
-//
-//    expect(await blankArt.foundationAddress()).to.equal(_owner.address);
-//
-//    await blankArt.updateFoundationAddress(addr1.address);
-//
-//    expect(await blankArt.foundationAddress()).to.equal(addr1.address);
-//  });
-//
-//  it("should not allow you to update the foundation address from the wrong sender", async () => {
-//    const [_owner, addr1, addr2] = await ethers.getSigners();
-//
-//    expect(await blankArt.foundationAddress()).to.equal(_owner.address);
-//
-//    await expect(blankArt.connect(addr1).updateFoundationAddress(addr2.address)).to.be.revertedWith("Only the foundation can make this call");
-//
-//    expect(await blankArt.foundationAddress()).to.equal(_owner.address);
-//  });
-//
-//  it.skip("should allow you to update the tokenURI if it is not locked", async () => {
-//    // updateTokenURI
-//    const [_owner, addr1] = await ethers.getSigners();
-//
-//    // await blankArt.
-//
-//    await expect(blankArt.connect(addr1).updateFoundationAddress(addr2.address)).to.be.revertedWith("Only the foundation can make this call");
-//
-//    expect(await blankArt.foundationAddress()).to.equal(_owner.address);
-//  })
+    await contract.updateFoundationAddress(redeemer.address);
+
+    expect(await contract.foundationAddress()).to.equal(redeemer.address);
+  });
+
+  it("should not allow you to update the foundation address from the wrong sender", async () => {
+
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.foundationAddress()).to.equal(minter.address);
+
+    await expect(contract.connect(redeemer).updateFoundationAddress(minter.address)).to.be.revertedWith("Only the foundation can make this call");
+
+    expect(await contract.foundationAddress()).to.equal(minter.address);
+  });
+
+  it.skip("should allow you to update the tokenURI if it is not locked", async () => {
+    // updateTokenURI
+
+  })
   
 
 });
