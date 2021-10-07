@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
 
+import "hardhat/console.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -154,7 +155,7 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
         address signer = _verify(voucher);
 
         // make sure that the signer is the foundation address
-        //require(payable(signer) == foundationAddress, "Signature invalid or unauthorized");
+        require(payable(signer) == foundationAddress, "Signature invalid or unauthorized");
 
         // make sure that the redeemer is paying enough to cover the buyer's cost
         require(msg.value >= (voucher.minPrice * amount), "Insufficient funds to redeem");
@@ -166,11 +167,14 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
 
             // transfer the token to the redeemer
             _transfer(signer, redeemer, tokenId);
+            _memberMintCount[signer]--;
+            _memberMintCount[redeemer]++;
 
             // record payment to signer's withdrawal balance
             pendingWithdrawals[signer] += msg.value;
             tokenIds[num] = tokenId;
         }
+        console.log(tokenIndex);
         return tokenIds;
     }
 
@@ -194,7 +198,7 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
   /// @param voucher An NFTVoucher to hash.
   function _hash(BlankNFTVoucher calldata voucher) internal view returns (bytes32) {
     return _hashTypedDataV4(keccak256(abi.encode(
-      keccak256("NFTVoucher(uint256 minPrice)"),
+      keccak256("BlankNFTVoucher(uint256 minPrice)"),
       voucher.minPrice
     )));
   }
