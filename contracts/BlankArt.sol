@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.2;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
@@ -9,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 
-contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, AccessControl, Ownable {
+contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable {
     // An event whenever the foundation address is updated
     event FoundationAddressUpdated(address foundationAddress);
 
@@ -19,36 +18,32 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, AccessC
 
     // if a token's URI has been locked or not
     mapping(uint256 => bool) public tokenURILocked;
-    // minter role (to be assigned to a foundation minter wallet)
-    bytes32 public MINTER_ROLE = keccak256("MINTER_ROLE");
     // signing domain
-    string private SIGNING_DOMAIN;
+    string private constant SIGNING_DOMAIN = "BlankNFT";
     // signature version
-    string private constant SIGNATURE_VERSION;
+    string private constant SIGNATURE_VERSION = "1";
     // the percentage of sale that the foundation gets on secondary sales
     uint256 public foundationSalePercentage;
     // gets incremented to placehold for tokens not minted yet
     uint256 public expectedTokenSupply;
-    // the address of the platform (for receving commissions and royalties)
+    // the address of the platform (for receiving commissions and royalties)
     address payable public foundationAddress;
-    // If an account can mint
-    mapping(address => bool) private _members;
+    // pending withdrawals by account address
+    mapping (address => uint256) pendingWithdrawals;
     // Number of tokens minted by account
     mapping(address => uint8) private _memberMintCount;
     // Max number of tokens a member can mint
     uint8 public memberMaxMintCount;
     // current token index
-    uint256 private tokenIndex;
+    uint256 public tokenIndex;
 
-    constructor(uint256 initialExpectedTokenSupply)
+    constructor(address payable _foundationAddress, uint256 initialExpectedTokenSupply)
         ERC721("BlankArt", "BLANK")
         EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION)
     {
         foundationSalePercentage = 50;
         memberMaxMintCount = 5;
-        foundationAddress = payable(msg.sender);
-        _setupRole(MINTER_ROLE, foundationAddress); // should this be a different address?
-        _members[msg.sender] = true;
+        foundationAddress = _foundationAddress;
         expectedTokenSupply = initialExpectedTokenSupply;
         require(expectedTokenSupply > 0);
         tokenIndex = 1;
@@ -57,7 +52,7 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, AccessC
         /// @notice Represents a voucher to claim any un-minted NFT (up to memberMaxMintCount), which has not yet been recorded into the blockchain. A signed voucher can be redeemed for real NFTs using the redeemVoucher function.
     struct BlankNFTVoucher {
         /// @notice The minimum price (in wei) that the NFT creator is willing to accept for the initial sale of this NFT.       uint256 minPrice;
-
+        uint256 minPrice;
         /// @notice the EIP-712 signature of all other fields in the NFTVoucher struct. For a voucher to be valid, it must be signed by an account with the MINTER_ROLE.
         bytes signature;
     }
@@ -86,10 +81,8 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, AccessC
         _;
     }
 
-    modifier onlyMembers() {
-        //        require(members[msg.sender], "Sender not whitelisted to mint.");
-        _checkMembership(msg.sender);
-        _;
+    function isMember(address account) external view returns (bool) {
+        return (_memberMintCount[account] > 0);
     }
 
     function tokenURI(uint256 tokenId)
@@ -101,34 +94,7 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, AccessC
         return super.tokenURI(tokenId);
     }
 
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721, ERC721Enumerable)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
-    }
-
-    function isMember(address account) public view returns (bool) {
-        return _members[account];
-    }
-
-    function _checkMembership(address account) internal view {
-        if (!isMember(account)) {
-            revert(
-                string(
-                    abi.encodePacked(
-                        "Account ",
-                        Strings.toHexString(uint160(account), 20),
-                        " is not a member, so cannot mint"
-                    )
-                )
-            );
-        }
-    }
-
-    function _checkMemberMintCount(address account) internal view onlyMembers {
+    function _checkMemberMintCount(address account) internal view {
         if (_memberMintCount[account] >= memberMaxMintCount) {
             revert(
                 string(
@@ -141,45 +107,6 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, AccessC
                     )
                 )
             );
-        }
-    }
-
-    function addMember(address account) public virtual onlyFoundation {
-        _addMember(account);
-    }
-
-    function _addMember(address account) internal virtual {
-        if (!isMember(account)) {
-            _members[account] = true;
-            _memberMintCount[account] = 0;
-            emit MemberAdded(account);
-        }
-    }
-
-    function addMembersBatch(address[] memory accounts)
-        public
-        virtual
-        onlyFoundation
-    {
-        for (uint256 account = 0; account < accounts.length; account++) {
-            addMember(accounts[account]);
-        }
-    }
-
-    function revokeMember(address account) public virtual onlyFoundation {
-        if (isMember(account)) {
-            _members[account] = false;
-            emit MemberRevoked(account);
-        }
-    }
-
-    function revokeMembersBatch(address[] memory accounts)
-        public
-        virtual
-        onlyFoundation
-    {
-        for (uint256 account = 0; account < accounts.length; account++) {
-            revokeMember(accounts[account]);
         }
     }
 
@@ -214,43 +141,41 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, AccessC
         tokenURILocked[tokenId] = true;
     }
 
-    function mintBlank() external onlyMembers {
-        tokenId = tokenIndex;
-        super._safeMint(msg.sender, tokenId);
+    function _mintBlank(address owner) private returns (uint256) {
+        uint256 tokenId = tokenIndex;
+        super._safeMint(owner, tokenId);
         tokenIndex++;
-        _memberMintCount[msg.sender]++;
+        _memberMintCount[owner]++;
         return tokenId;
     }
 
-    function redeemVoucher(address redeemer, uint256 amount, BlankNFTVoucher calldata voucher) public payable returns (uint256[]) {
+    function redeemVoucher(address redeemer, uint256 amount, BlankNFTVoucher calldata voucher) public payable returns (uint256[5] memory) {
         // make sure signature is valid and get the address of the signer
         address signer = _verify(voucher);
 
-        // make sure that the signer is authorized to mint NFTs
-        require(hasRole(MINTER_ROLE, signer), "Signature invalid or unauthorized");
+        // make sure that the signer is the foundation address
+        //require(payable(signer) == foundationAddress, "Signature invalid or unauthorized");
 
         // make sure that the redeemer is paying enough to cover the buyer's cost
         require(msg.value >= (voucher.minPrice * amount), "Insufficient funds to redeem");
 
         // first assign the token to the signer, to establish provenance on-chain
-        tokenIds = uint256[];
+        uint256[5] memory tokenIds;
         for (uint256 num = 0; num < amount; num++) {
-            tokenId = mintBlank(signer);
+            uint256 tokenId = _mintBlank(signer);
 
             // transfer the token to the redeemer
             _transfer(signer, redeemer, tokenId);
 
             // record payment to signer's withdrawal balance
             pendingWithdrawals[signer] += msg.value;
-            tokenIds += tokenId;   
+            tokenIds[num] = tokenId;
         }
         return tokenIds;
     }
 
   /// @notice Transfers all pending withdrawal balance to the caller. Reverts if the caller is not an authorized minter.
-  function withdraw() public {
-    require(hasRole(MINTER_ROLE, msg.sender), "Only authorized minters can withdraw");
-    
+  function withdraw() public onlyFoundation {
     // IMPORTANT: casting msg.sender to a payable address is only safe if ALL members of the minter role are payable addresses.
     address payable receiver = payable(msg.sender);
 
@@ -261,7 +186,7 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, AccessC
   }
 
   /// @notice Retuns the amount of Ether available to the caller to withdraw.
-  function availableToWithdraw() public view returns (uint256) {
+  function availableToWithdraw() public view onlyFoundation returns (uint256) {
     return pendingWithdrawals[msg.sender];
   }
 
@@ -293,8 +218,7 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, AccessC
     return ECDSA.recover(digest, voucher.signature);
   }
 
-  function supportsInterface(bytes4 interfaceId) public view virtual override (AccessControl, ERC721) returns (bool) {
-    return ERC721.supportsInterface(interfaceId) || AccessControl.supportsInterface(interfaceId);
+  function supportsInterface(bytes4 interfaceId) public view virtual override (ERC721, ERC721Enumerable) returns (bool) {
+    return ERC721.supportsInterface(interfaceId);
   }
 }
-
