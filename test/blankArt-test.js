@@ -27,9 +27,9 @@ describe("BlankArt", function () {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
-    const voucher = await lazyMinter.createVoucher()
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
 
-    await expect(redeemerContract.redeemVoucher(redeemer.address, 1, voucher))
+    await expect(redeemerContract.redeemVoucher(1, voucher))
       .to.emit(contract, 'Transfer')  // transfer from null address to minter
       //.withArgs('0x0000000000000000000000000000000000000000', minter.address, contract.tokenIndex - 1)
       .and.to.emit(contract, 'Transfer') // transfer from minter to redeemer
@@ -39,9 +39,9 @@ describe("BlankArt", function () {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
-    const voucher = await lazyMinter.createVoucher()
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
 
-    await expect(redeemerContract.redeemVoucher(redeemer.address, 5, voucher))
+    await expect(redeemerContract.redeemVoucher(5, voucher))
       .to.emit(contract, 'Transfer')  // transfer from null address to minter
       //.withArgs('0x0000000000000000000000000000000000000000', minter.address, contract.tokenIndex - 1)
       .and.to.emit(contract, 'Transfer') // transfer from minter to redeemer
@@ -51,11 +51,21 @@ describe("BlankArt", function () {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
-    const voucher = await lazyMinter.createVoucher()
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
 
     const amount = 6;
-    await expect(redeemerContract.redeemVoucher(redeemer.address, amount, voucher))
+    await expect(redeemerContract.redeemVoucher(amount, voucher))
       .to.be.revertedWith("Amount is more than the minting limit");
+  });
+  it("Should error on an attempt to redeem a voucher from the wrong address", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
+
+    await expect(contract.connect(addr2).redeemVoucher(1, voucher))
+      .to.be.revertedWith("Voucher is for a different wallet address");
   });
 
   it("should allow you to check membership if an address has minted", async () => {
@@ -64,9 +74,9 @@ describe("BlankArt", function () {
     expect(await contract.isMember(redeemer.address)).to.equal(false);
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
-    const voucher = await lazyMinter.createVoucher()
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
 
-    await redeemerContract.redeemVoucher(redeemer.address, 1, voucher)
+    await redeemerContract.redeemVoucher(1, voucher)
 
     expect(await contract.isMember(redeemer.address)).to.equal(true);
   });
@@ -77,9 +87,9 @@ describe("BlankArt", function () {
     const rando = signers[signers.length-1];
 
     const lazyMinter = new LazyMinter({ contract, signer: rando })
-    const voucher = await lazyMinter.createVoucher()
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
 
-    await expect(redeemerContract.redeemVoucher(redeemer.address, 1, voucher))
+    await expect(redeemerContract.redeemVoucher(1, voucher))
       .to.be.revertedWith('Signature invalid or unauthorized')
   });
 
@@ -90,9 +100,9 @@ describe("BlankArt", function () {
     const rando = signers[signers.length-1];
 
     const lazyMinter = new LazyMinter({ contract, signer: rando })
-    const voucher = await lazyMinter.createVoucher(10)
+    const voucher = await lazyMinter.createVoucher(redeemer.address, 10)
     voucher.minPrice = 0
-    await expect(redeemerContract.redeemVoucher(redeemer.address, 1, voucher))
+    await expect(redeemerContract.redeemVoucher(1, voucher))
       .to.be.revertedWith('Signature invalid or unauthorized')
   });
 
@@ -103,12 +113,12 @@ describe("BlankArt", function () {
     const rando = signers[signers.length-1];
 
     const lazyMinter = new LazyMinter({ contract, signer: rando })
-    const voucher = await lazyMinter.createVoucher()
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
 
     const dummyData = ethers.utils.randomBytes(128)
     voucher.signature = await minter.signMessage(dummyData)
 
-    await expect(redeemerContract.redeemVoucher(redeemer.address, 1, voucher))
+    await expect(redeemerContract.redeemVoucher(1, voucher))
       .to.be.revertedWith('Signature invalid or unauthorized')
   });
   it("Should fail to redeem if payment is < minPrice", async function() {
@@ -116,10 +126,10 @@ describe("BlankArt", function () {
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
     const minPrice = ethers.constants.WeiPerEther // charge 1 Eth
-    const voucher = await lazyMinter.createVoucher(minPrice)
+    const voucher = await lazyMinter.createVoucher(redeemer.address, minPrice)
 
     const payment = minPrice.sub(10000)
-    await expect(redeemerContract.redeemVoucher(redeemer.address, 1, voucher, { value: payment }))
+    await expect(redeemerContract.redeemVoucher(1, voucher, { value: payment }))
       .to.be.revertedWith('Insufficient funds to redeem')
   })
 
@@ -128,10 +138,10 @@ describe("BlankArt", function () {
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
     const minPrice = ethers.constants.WeiPerEther // charge 1 Eth
-    const voucher = await lazyMinter.createVoucher(minPrice)
+    const voucher = await lazyMinter.createVoucher(redeemer.address, minPrice)
 
     // the payment should be sent from the redeemer's account to the contract address
-    await expect(await redeemerContract.redeemVoucher(redeemer.address, 1, voucher, { value: minPrice }))
+    await expect(await redeemerContract.redeemVoucher(1, voucher, { value: minPrice }))
       .to.changeEtherBalances([redeemer, contract], [minPrice.mul(-1), minPrice])
 
     // minter should have funds available to withdraw

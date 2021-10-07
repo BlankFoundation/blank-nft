@@ -52,7 +52,9 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
 
         /// @notice Represents a voucher to claim any un-minted NFT (up to memberMaxMintCount), which has not yet been recorded into the blockchain. A signed voucher can be redeemed for real NFTs using the redeemVoucher function.
     struct BlankNFTVoucher {
-        /// @notice The minimum price (in wei) that the NFT creator is willing to accept for the initial sale of this NFT.       uint256 minPrice;
+        /// @notice address of intended redeemer
+        address redeemerAddress;
+        /// @notice The minimum price (in wei) that the NFT creator is willing to accept for the initial sale of this NFT.
         uint256 minPrice;
         /// @notice the EIP-712 signature of all other fields in the NFTVoucher struct. For a voucher to be valid, it must be signed by an account with the MINTER_ROLE.
         bytes signature;
@@ -150,9 +152,11 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
         return tokenId;
     }
 
-    function redeemVoucher(address redeemer, uint256 amount, BlankNFTVoucher calldata voucher) public payable returns (uint256[5] memory) {
+    function redeemVoucher(uint256 amount, BlankNFTVoucher calldata voucher) public payable returns (uint256[5] memory) {
         // make sure signature is valid and get the address of the signer
         address signer = _verify(voucher);
+        // make sure caller is the redeemer
+        require(msg.sender == voucher.redeemerAddress, "Voucher is for a different wallet address");
 
         // make sure that the signer is the foundation address
         require(payable(signer) == foundationAddress, "Signature invalid or unauthorized");
@@ -168,9 +172,9 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
             uint256 tokenId = _mintBlank(signer);
 
             // transfer the token to the redeemer
-            _transfer(signer, redeemer, tokenId);
+            _transfer(signer, voucher.redeemerAddress, tokenId);
             _memberMintCount[signer]--;
-            _memberMintCount[redeemer]++;
+            _memberMintCount[voucher.redeemerAddress]++;
 
             // record payment to signer's withdrawal balance
             pendingWithdrawals[signer] += msg.value;
@@ -200,7 +204,8 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
   /// @param voucher An NFTVoucher to hash.
   function _hash(BlankNFTVoucher calldata voucher) internal view returns (bytes32) {
     return _hashTypedDataV4(keccak256(abi.encode(
-      keccak256("BlankNFTVoucher(uint256 minPrice)"),
+      keccak256("BlankNFTVoucher(address redeemerAddress,uint256 minPrice)"),
+      voucher.redeemerAddress,
       voucher.minPrice
     )));
   }
