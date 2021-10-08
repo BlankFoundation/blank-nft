@@ -57,6 +57,21 @@ describe("BlankArt", function () {
     await expect(redeemerContract.redeemVoucher(amount, voucher))
       .to.be.revertedWith("Amount is more than the minting limit");
   });
+  it("Should error on an attempt to mint twice for more than max amount total", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
+
+    await expect(redeemerContract.redeemVoucher(2, voucher))
+      .to.emit(contract, 'Transfer')  // transfer from null address to minter
+      //.withArgs('0x0000000000000000000000000000000000000000', minter.address, contract.tokenIndex - 1)
+      .and.to.emit(contract, 'Transfer') // transfer from minter to redeemer
+      //.withArgs(minter.address, redeemer.address, contract.tokenIndex - 1);
+
+    await expect(redeemerContract.redeemVoucher(4, voucher))
+      .to.be.revertedWith("Amount is more than the minting limit");
+  });
   it("Should error on an attempt to redeem a voucher from the wrong address", async function() {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
@@ -150,6 +165,27 @@ describe("BlankArt", function () {
     // withdrawal should increase minter's balance
     await expect(await contract.withdraw())
       .to.changeEtherBalance(minter, minPrice)
+
+    // minter should now have zero available
+    expect(await contract.availableToWithdraw()).to.equal(0)
+  })
+  it("Should withdraw for the correct amount of payment", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const minPrice = ethers.constants.WeiPerEther // charge 1 Eth
+    const voucher = await lazyMinter.createVoucher(redeemer.address, minPrice)
+
+    // the payment should be sent from the redeemer's account to the contract address
+    await expect(await redeemerContract.redeemVoucher(5, voucher, { value: minPrice.mul(5) }))
+      .to.changeEtherBalances([redeemer, contract], [minPrice.mul(-5), minPrice.mul(5)])
+
+    // minter should have funds available to withdraw
+    expect(await contract.availableToWithdraw()).to.equal(minPrice.mul(5))
+
+    // withdrawal should increase minter's balance
+    await expect(await contract.withdraw())
+      .to.changeEtherBalance(minter, minPrice.mul(5))
 
     // minter should now have zero available
     expect(await contract.availableToWithdraw()).to.equal(0)
