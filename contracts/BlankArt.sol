@@ -145,6 +145,7 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
 
     function _mintBlank(address owner) private returns (uint256) {
         uint256 tokenId = tokenIndex;
+        _checkMemberMintCount(owner);
         super._safeMint(owner, tokenId);
         tokenIndex++;
         _memberMintCount[owner]++;
@@ -165,16 +166,10 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
         // make sure that the redeemer is paying enough to cover the buyer's cost
         require(msg.value >= (voucher.minPrice * amount), "Insufficient funds to redeem");
 
-        // first assign the token to the signer, to establish provenance on-chain
+        // assign the token directly to the redeemer
         uint256[5] memory tokenIds;
         for (uint256 num = 0; num < amount; num++) {
-            uint256 tokenId = _mintBlank(signer);
-
-            // transfer the token to the redeemer
-            _transfer(signer, voucher.redeemerAddress, tokenId);
-            _memberMintCount[signer]--;
-            _memberMintCount[voucher.redeemerAddress]++;
-
+            uint256 tokenId = _mintBlank(voucher.redeemerAddress);
             tokenIds[num] = tokenId;
         }
         // record payment to signer's withdrawal balance
