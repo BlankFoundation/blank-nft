@@ -1,12 +1,24 @@
 {
-  "name": "hardhat-project",
+  "name": "blank-nft",
+  "version": "0.0.1",
+  "author": "Blank Foundation",
+  "license": "UNLICENSED",
+  "scripts": {
+    "lint:sol": "solium --dir ./contracts",
+    "lint:sol:fix": "solium --dir ./contracts --fix",
+    "prettier:sol": "prettier --write 'contracts/*.sol'",
+    "prettier:js": "prettier --write 'scripts/*.js'",
+  },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
     "chai": "^4.3.4",
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.4.7",
-    "hardhat": "^2.6.4"
+    "ethlint": "^1.2.5",
+    "hardhat": "^2.6.4",
+    "prettier": "^2.4.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.18"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.3.2"
