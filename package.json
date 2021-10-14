@@ -4,21 +4,35 @@
   "author": "Blank Foundation",
   "license": "UNLICENSED",
   "scripts": {
+    "compile": "hardhat compile",
+    "typechain": "hardhat typechain",
+    "test": "hardhat test",
+    "test:gas": "REPORT_GAS=true hardhat test",
+    "contract-sizes": "yarn run hardhat size-contracts",
+    "deploy": "hardhat run scripts/deployBlankArt.js",
+    "deploy:hardhat": "yarn deploy -- --network hardat --force",
+    "persistent-test-network": "hardhat node",
     "lint:sol": "solium --dir ./contracts",
     "lint:sol:fix": "solium --dir ./contracts --fix",
     "prettier:sol": "prettier --write 'contracts/*.sol'",
-    "prettier:js": "prettier --write 'scripts/*.js'",
+    "prettier:js": "prettier --write 'scripts/*.js'"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@typechain/ethers-v5": "^7.2.0",
+    "@typechain/hardhat": "^2.3.1",
     "chai": "^4.3.4",
     "ethereum-waffle": "^3.4.0",
     "ethers": "^5.4.7",
     "ethlint": "^1.2.5",
     "hardhat": "^2.6.4",
+    "hardhat-abi-exporter": "^2.3.0",
+    "hardhat-contract-sizer": "^2.1.1",
+    "hardhat-gas-reporter": "^1.0.4",
     "prettier": "^2.4.1",
-    "prettier-plugin-solidity": "^1.0.0-beta.18"
+    "prettier-plugin-solidity": "^1.0.0-beta.18",
+    "typechain": "^5.2.0"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.3.2"
