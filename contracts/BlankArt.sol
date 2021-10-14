@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.2;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
@@ -15,6 +15,10 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
     event MemberAdded(address member);
 
     event MemberRevoked(address member);
+
+    event TokenUriUpdated(uint256 tokenId, string tokenURI);
+
+    event Minted(uint256 tokenId, address member, string tokenURI);
 
     // if a token's URI has been locked or not
     mapping(uint256 => bool) public tokenURILocked;
@@ -121,6 +125,8 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
         require(tokenURILocked[tokenId] == false);
         // update the token URI
         super._setTokenURI(tokenId, newTokenURI);
+
+        emit TokenUriUpdated(tokenId, newTokenURI);
     }
 
     // Locks a token's URI from being updated
@@ -137,6 +143,8 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
         super._safeMint(owner, tokenId);
         tokenIndex++;
         _memberMintCount[owner]++;
+        string memory tokenUri = super.tokenURI(tokenId);
+        emit Minted(tokenId, owner, tokenUri);
         return tokenId;
     }
 
