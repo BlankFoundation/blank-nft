@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 
-contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable {
+contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     // An event whenever the foundation address is updated
     event FoundationAddressUpdated(address foundationAddress);
 
@@ -67,7 +65,7 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
         address from,
         address to,
         uint256 tokenId
-    ) internal override(ERC721, ERC721Enumerable) {
+    ) internal override(ERC721) {
         super._beforeTokenTransfer(from, to, tokenId);
     }
 
@@ -234,7 +232,7 @@ contract BlankArt is ERC721, EIP712, ERC721Enumerable, ERC721URIStorage, Ownable
         public
         view
         virtual
-        override(ERC721, ERC721Enumerable)
+        override(ERC721)
         returns (bool)
     {
         return ERC721.supportsInterface(interfaceId);
