@@ -211,6 +211,230 @@ describe("BlankArt", function () {
     // updateTokenURI
 
   })
+
+  it("should allow you to update the mint price", async () => {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const price = ethers.constants.WeiPerEther // charge 1 Eth
+
+    expect(await contract.mintPrice()).to.equal(0);
+
+    await contract.updateMintPrice(price);
+
+    expect(await contract.mintPrice()).to.equal(price);
+  });
+
+  it("should not allow you to update the mint price from the wrong sender", async () => {
+
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+    const price = ethers.constants.WeiPerEther // charge 1 Eth
+
+    expect(await contract.mintPrice()).to.equal(0);
+
+    await expect(contract.connect(addr2).updateMintPrice(price)).to.be.revertedWith("Only the foundation can make this call");
+
+    expect(await contract.mintPrice()).to.equal(0);
+  });
   
+  it("Should not allow you to mint up to 5 Blank NFTs if public minting is not enabled", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    await expect(redeemerContract.mint(5)).to.be.revertedWith("Public minting is not active.");    
+  });
+
+  it("should allow the foundation to update the public mint period", async () => {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.updatePublicMint(true);
+
+    expect(await contract.publicMint()).to.equal(true);
+  });
+
+  it("should not allow you to update the public mint period from the wrong sender", async () => {
+
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await expect(contract.connect(addr2).updatePublicMint(true)).to.be.revertedWith("Only the foundation can make this call");
+
+    expect(await contract.publicMint()).to.equal(false);
+  });
+
+  it("should not allow the foundation to update the public mint period if it is already set to the new value", async () => {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await expect(contract.updatePublicMint(false)).to.be.revertedWith("Public minting is already set");
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.updatePublicMint(true);    
+
+    expect(await contract.publicMint()).to.equal(true);
+
+    await expect(contract.updatePublicMint(true)).to.be.revertedWith("Public minting is already set");
+
+    expect(await contract.publicMint()).to.equal(true);
+  });
+  
+  it("Should allow anyone to mint one Blank NFT for free if public minting is enabled", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.updatePublicMint(true);
+
+    expect(await contract.publicMint()).to.equal(true);
+
+    await expect(contract.connect(addr2).mint(1))
+      .to.emit(contract, 'Transfer')  // transfer from null address to minter
+      //.withArgs('0x0000000000000000000000000000000000000000', redeemer.address, contract.tokenIndex - 1)
+  });
+
+  it("Should allow anyone to mint up to 5 Blank NFTs for free if public minting is enabled", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.updatePublicMint(true);
+
+    expect(await contract.publicMint()).to.equal(true);
+
+    await expect(contract.connect(addr2).mint(5))
+      .to.emit(contract, 'Transfer')  // transfer from null address to minter
+      //.withArgs('0x0000000000000000000000000000000000000000', redeemer.address, contract.tokenIndex - 1)
+  });
+
+  it("Should error on an attempt to mint more than 5 Blank NFTs during public minting", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.updatePublicMint(true);
+
+    expect(await contract.publicMint()).to.equal(true);
+
+    await expect(contract.connect(addr2).mint(6))
+      .to.be.revertedWith("Amount is more than the minting limit");
+  });
+  it("Should error on an attempt to mint twice for more than max amount total", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.updatePublicMint(true);
+
+    expect(await contract.publicMint()).to.equal(true);
+
+    await expect(contract.connect(addr2).mint(2))
+      .to.emit(contract, 'Transfer')  // transfer from null address to minter
+      //.withArgs('0x0000000000000000000000000000000000000000', redeemer.address, contract.tokenIndex - 1)
+
+      await expect(contract.connect(addr2).mint(4))
+      .to.be.revertedWith("Amount is more than the minting limit");
+  });
+  
+  it("Should allow anyone to mint one Blank NFT if public minting is enabled, mint price is set and payment is conveyed", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+    const price = ethers.constants.WeiPerEther // charge 1 Eth
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.updatePublicMint(true);
+
+    expect(await contract.publicMint()).to.equal(true);    
+
+    expect(await contract.mintPrice()).to.equal(0);
+
+    await contract.updateMintPrice(price);
+
+    expect(await contract.mintPrice()).to.equal(price);
+
+    const payment = price;
+
+    await expect(contract.connect(addr2).mint(1, { value: payment }))
+      .to.emit(contract, 'Transfer')  // transfer from null address to minter
+      //.withArgs('0x0000000000000000000000000000000000000000', redeemer.address, contract.tokenIndex - 1)
+  });
+
+  it("Should allow anyone to mint 5 Blank NFTs if public minting is enabled, mint price is set and payment is conveyed", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+    const price = ethers.constants.WeiPerEther // charge 1 Eth
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.updatePublicMint(true);
+
+    expect(await contract.publicMint()).to.equal(true);    
+
+    expect(await contract.mintPrice()).to.equal(0);
+
+    await contract.updateMintPrice(price);
+
+    expect(await contract.mintPrice()).to.equal(price);
+
+    const payment = price.mul(5);
+
+    await expect(contract.connect(addr2).mint(5, { value: payment }))
+      .to.emit(contract, 'Transfer')  // transfer from null address to minter
+      //.withArgs('0x0000000000000000000000000000000000000000', redeemer.address, contract.tokenIndex - 1)
+  });
+
+  it("Should not allow anyone to mint one Blank NFT if public minting is enabled and mint price is set but payment is not sufficient", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+    const price = ethers.constants.WeiPerEther // charge 1 Eth
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.updatePublicMint(true);
+
+    expect(await contract.publicMint()).to.equal(true);    
+
+    expect(await contract.mintPrice()).to.equal(0);
+
+    await contract.updateMintPrice(price);
+
+    expect(await contract.mintPrice()).to.equal(price);
+
+    const payment = price.sub(1000);
+
+    await expect(contract.connect(addr2).mint(1, { value: payment }))
+      .to.be.revertedWith('Insufficient funds to mint')
+  });
+
+  it("Should not allow anyone to mint 5 Blank NFT if public minting is enabled and mint price is set but payment is not sufficient", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+    const price = ethers.constants.WeiPerEther // charge 1 Eth
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.updatePublicMint(true);
+
+    expect(await contract.publicMint()).to.equal(true);    
+
+    expect(await contract.mintPrice()).to.equal(0);
+
+    await contract.updateMintPrice(price);
+
+    expect(await contract.mintPrice()).to.equal(price);
+
+    const payment = price.mul(4);
+
+    await expect(contract.connect(addr2).mint(5, { value: payment }))
+      .to.be.revertedWith('Insufficient funds to mint')
+  });
 
 });
