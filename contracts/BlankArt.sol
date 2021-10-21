@@ -147,13 +147,9 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         mintPrice = price;
     }
     
-    // Set the ability to mint publically
-    function updatePublicMint(bool publicallyAvailable) external onlyFoundation {
-        // Verify that this would be a change
-        require(publicMint != publicallyAvailable, "Public minting is already set");
-
-        // Update the publicMint boolean
-        publicMint = publicallyAvailable;
+    // Toggle the value of publicMint
+    function togglePublicMint() external onlyFoundation {        
+        publicMint = !publicMint;
     }
 
     function _mintBlank(address owner) private returns (uint256) {

@@ -247,9 +247,13 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await contract.updatePublicMint(true);
+    await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(true);
+    
+    await contract.togglePublicMint();
+
+    expect(await contract.publicMint()).to.equal(false);
   });
 
   it("should not allow you to update the public mint period from the wrong sender", async () => {
@@ -259,36 +263,18 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await expect(contract.connect(addr2).updatePublicMint(true)).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(addr2).togglePublicMint()).to.be.revertedWith("Only the foundation can make this call");
 
     expect(await contract.publicMint()).to.equal(false);
   });
-
-  it("should not allow the foundation to update the public mint period if it is already set to the new value", async () => {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
-
-    expect(await contract.publicMint()).to.equal(false);
-
-    await expect(contract.updatePublicMint(false)).to.be.revertedWith("Public minting is already set");
-
-    expect(await contract.publicMint()).to.equal(false);
-
-    await contract.updatePublicMint(true);    
-
-    expect(await contract.publicMint()).to.equal(true);
-
-    await expect(contract.updatePublicMint(true)).to.be.revertedWith("Public minting is already set");
-
-    expect(await contract.publicMint()).to.equal(true);
-  });
-  
+ 
   it("Should allow anyone to mint one Blank NFT for free if public minting is enabled", async function() {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await contract.updatePublicMint(true);
+    await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(true);
 
@@ -303,7 +289,7 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await contract.updatePublicMint(true);
+    await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(true);
 
@@ -318,7 +304,7 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await contract.updatePublicMint(true);
+    await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(true);
 
@@ -331,7 +317,7 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await contract.updatePublicMint(true);
+    await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(true);
 
@@ -350,7 +336,7 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await contract.updatePublicMint(true);
+    await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(true);    
 
@@ -374,7 +360,7 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await contract.updatePublicMint(true);
+    await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(true);    
 
@@ -398,7 +384,7 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await contract.updatePublicMint(true);
+    await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(true);    
 
@@ -421,7 +407,7 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await contract.updatePublicMint(true);
+    await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(true);    
 
