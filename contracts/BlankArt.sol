@@ -142,15 +142,6 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         emit FoundationAddressUpdated(newFoundationAddress);
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
     // Locks a token's URI from being updated. Only callable by the token owner.
     function lockTokenURI(uint256 tokenId) external {
         // ensure that this token exists
