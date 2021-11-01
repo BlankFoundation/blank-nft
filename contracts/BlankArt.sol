@@ -28,6 +28,10 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     uint256 public foundationSalePercentage;
     // gets incremented to placehold for tokens not minted yet
     uint256 public expectedTokenSupply;
+    // cost to mint during the public sale
+    uint256 public mintPrice;
+    // Enables/Disables public minting (without a whitelisted voucher)
+    bool public publicMint;
     // the address of the platform (for receiving commissions and royalties)
     address payable public foundationAddress;
     // pending withdrawals by account address
@@ -49,6 +53,8 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         expectedTokenSupply = initialExpectedTokenSupply;
         require(expectedTokenSupply > 0);
         tokenIndex = 1;
+        mintPrice = 0;
+        publicMint = false;
     }
 
     /// @notice Represents a voucher to claim any un-minted NFT (up to memberMaxMintCount), which has not yet been recorded into the blockchain. A signed voucher can be redeemed for real NFTs using the redeemVoucher function.
@@ -135,6 +141,17 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         tokenURILocked[tokenId] = true;
     }
 
+    // Updates the mintPrice
+    function updateMintPrice(uint256 price) external onlyFoundation {
+        // Update the mintPrice
+        mintPrice = price;
+    }
+    
+    // Toggle the value of publicMint
+    function togglePublicMint() external onlyFoundation {        
+        publicMint = !publicMint;
+    }
+
     function _mintBlank(address owner) private returns (uint256) {
         uint256 tokenId = tokenIndex;
         _checkMemberMintCount(owner);
@@ -175,6 +192,32 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         }
         // record payment to signer's withdrawal balance
         pendingWithdrawals[signer] += msg.value;
+        return tokenIds;
+    }
+
+    // Public mint function. Whitelisted members will utilize redeemVoucher()
+    function mint(uint256 amount)
+        public
+        payable
+        returns (uint256[5] memory)
+    {
+        require(publicMint, "Public minting is not active.");
+        require(
+            _memberMintCount[msg.sender] + amount <= memberMaxMintCount,
+            "Amount is more than the minting limit"
+        );
+
+        // make sure that the caller is paying enough to cover the mintPrice
+        require(msg.value >= (mintPrice * amount), "Insufficient funds to mint");
+
+        // assign the token directly to the redeemer
+        uint256[5] memory tokenIds;
+        for (uint256 num = 0; num < amount; num++) {
+            uint256 tokenId = _mintBlank(msg.sender);
+            tokenIds[num] = tokenId;
+        }
+        // record payment to foundationAddress withdrawal balance
+        pendingWithdrawals[foundationAddress] += msg.value;
         return tokenIds;
     }
 
