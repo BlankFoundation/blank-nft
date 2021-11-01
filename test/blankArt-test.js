@@ -119,6 +119,43 @@ describe("BlankArt", function () {
 
   });
 
+  it("Should allow the Foundation to evolve the NFTs", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
+
+    await expect(redeemerContract.redeemVoucher(3, voucher))
+      .to.emit(contract, 'Transfer');
+
+    //Verify tokenURIs are correct (v1)
+    expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[0] + "1");
+
+    //Evolve the NFTs
+    await contract.connect(minter).addBaseURI(arWeaveURI[1]);
+
+    //Verify tokenURIs are correct (v2)
+    expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[1] + "1");
+
+  });
+
+  it("Should not allow an address other than the Foundation to evolve the NFTs", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
+
+    await expect(redeemerContract.redeemVoucher(3, voucher))
+      .to.emit(contract, 'Transfer');
+
+    //Verify tokenURIs are correct (v1)
+    expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[0] + "1");
+
+    //Evolve the NFTs
+    await expect(contract.connect(redeemer).addBaseURI(arWeaveURI[1])).to.be.revertedWith("Only the foundation can make this call");
+
+  });
+
   it("Should return the correct tokenURIs for both locked and unlocked NFTs", async function() {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
 
