@@ -31,7 +31,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     // the percentage of sale that the foundation gets on secondary sales
     uint256 public foundationSalePercentage;
     // gets incremented to placehold for tokens not minted yet
-    uint256 public expectedTokenSupply;
+    uint256 public maxTokenSupply;
     // cost to mint during the public sale
     uint256 public mintPrice;
     // Enables/Disables public minting (without a whitelisted voucher)
@@ -40,22 +40,20 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     address payable public foundationAddress;
     // pending withdrawals by account address
     mapping(address => uint256) pendingWithdrawals;
-    // Number of tokens minted by account
-    mapping(address => uint8) private _memberMintCount;
     // Max number of tokens a member can mint
     uint8 public memberMaxMintCount;
     // current token index
     uint256 public tokenIndex;
 
-    constructor(address payable _foundationAddress, uint256 initialExpectedTokenSupply, string memory baseURI)
+    constructor(address payable _foundationAddress, uint256 _maxTokenSupply, string memory baseURI)
         ERC721("BlankArt", "BLANK")
         EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION)
     {
         foundationSalePercentage = 50;
         memberMaxMintCount = 5;
         foundationAddress = _foundationAddress;
-        expectedTokenSupply = initialExpectedTokenSupply;
-        require(expectedTokenSupply > 0);
+        maxTokenSupply = _maxTokenSupply;
+        require(maxTokenSupply > 0);
         tokenIndex = 1;
         mintPrice = 0;
         publicMint = false;
@@ -93,7 +91,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     }
 
     function isMember(address account) external view returns (bool) {
-        return (_memberMintCount[account] > 0);
+        return (balanceOf(account) > 0);
     }
 
     function addBaseURI(string calldata baseURI) external onlyFoundation {
@@ -120,7 +118,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     }
 
     function _checkMemberMintCount(address account) internal view {
-        if (_memberMintCount[account] >= memberMaxMintCount) {
+        if (balanceOf(account) >= memberMaxMintCount) {
             revert(
                 string(
                     abi.encodePacked(
@@ -170,7 +168,6 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         _checkMemberMintCount(owner);
         super._safeMint(owner, tokenId);
         tokenIndex++;
-        _memberMintCount[owner]++;
         string memory tokenUri = super.tokenURI(tokenId);
         emit Minted(tokenId, owner, tokenUri);
         return tokenId;
@@ -190,8 +187,13 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         require(payable(signer) == foundationAddress, "Signature invalid or unauthorized");
 
         require(
-            _memberMintCount[voucher.redeemerAddress] + amount <= memberMaxMintCount,
+            balanceOf(voucher.redeemerAddress) + amount <= memberMaxMintCount,
             "Amount is more than the minting limit"
+        );
+
+        require(
+            tokenIndex + amount <= maxTokenSupply + 1,
+            "All tokens have already been minted"
         );
 
         // make sure that the redeemer is paying enough to cover the buyer's cost
@@ -216,8 +218,13 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     {
         require(publicMint, "Public minting is not active.");
         require(
-            _memberMintCount[msg.sender] + amount <= memberMaxMintCount,
+            balanceOf(msg.sender) + amount <= memberMaxMintCount,
             "Amount is more than the minting limit"
+        );
+        
+        require(
+            tokenIndex + amount <= maxTokenSupply + 1,
+            "All tokens have already been minted"
         );
 
         // make sure that the caller is paying enough to cover the mintPrice

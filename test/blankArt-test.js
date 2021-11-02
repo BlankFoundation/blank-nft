@@ -10,11 +10,13 @@ describe("BlankArt", function () {
   arWeaveURI.push("ar://123456789/");
   arWeaveURI.push("ar://987654321/");
 
-  async function deploy() {
+  async function deploy(maxTokenSupply) {
       const [minter, redeemer, _] = await ethers.getSigners()
 
       let factory = await ethers.getContractFactory("BlankArt")
-      const contract = await factory.deploy(minter.address, 10000, arWeaveURI[0])
+      if(isNaN(maxTokenSupply))
+        maxTokenSupply = 10000
+      const contract = await factory.deploy(minter.address, maxTokenSupply, arWeaveURI[0])
 
       // the redeemerContract is an instance of the contract that's wired up to the redeemer's signing key
       const redeemerFactory = factory.connect(redeemer)
@@ -527,6 +529,49 @@ describe("BlankArt", function () {
 
     await expect(contract.connect(addr2).mint(5, { value: payment }))
       .to.be.revertedWith('Insufficient funds to mint')
+  });
+
+  it("Should not allow more than the maxSupply of NFTs to be minted", async function() {
+    // Set the max to 25 to allow the test to complete
+    const testMaxToken = 25;
+    const { contract, redeemerContract, redeemer, minter } = await deploy(testMaxToken)
+    const [_, __, addr2, addr3, addr4, addr5, addr6, addr7] = await ethers.getSigners()
+    const price = ethers.constants.WeiPerEther // charge 1 Eth    
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.togglePublicMint();
+
+    expect(await contract.publicMint()).to.equal(true);    
+
+    expect(await contract.mintPrice()).to.equal(0);
+
+    await contract.updateMintPrice(price);
+
+    expect(await contract.mintPrice()).to.equal(price);
+
+    const payment = price.mul(5);
+    const maxSupply = await contract.maxTokenSupply();
+
+    // Mint 5 (max allowed) NFTs per address until all (25) have been minted.
+    await expect(contract.connect(addr2).mint(5, { value: payment }))
+      .to.emit(contract, 'Transfer')  // transfer from null address to minter
+
+    await expect(contract.connect(addr3).mint(5, { value: payment }))
+    .to.emit(contract, 'Transfer')  // transfer from null address to minter
+
+    await expect(contract.connect(addr4).mint(5, { value: payment }))
+    .to.emit(contract, 'Transfer')  // transfer from null address to minter
+
+    await expect(contract.connect(addr5).mint(5, { value: payment }))
+    .to.emit(contract, 'Transfer')  // transfer from null address to minter
+
+    await expect(contract.connect(addr6).mint(5, { value: payment }))
+    .to.emit(contract, 'Transfer')  // transfer from null address to minter
+    
+    // Attempt to mint an extra NFT
+    await expect(contract.connect(addr7).mint(1, { value: payment }))
+      .to.be.revertedWith('All tokens have already been minted')
   });
 
 });
