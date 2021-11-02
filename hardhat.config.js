@@ -15,9 +15,6 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   }
 });
 
-const ALCHEMY_API_KEY = "U2hk8PPYlJPPBKe11Vdb-tmwmWLBDlQO";
-const ROPSTEN_PRIVATE_KEY = "7d5c892d1382b3553677eb479393e6f3bf20eb0ebf891d28679b9ee84f8d512e";
-
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
 
@@ -61,11 +58,7 @@ module.exports = {
         interval: 30000,
       },
       hardfork: 'london',
-    },
-    ropsten: {
-      url: `https://eth-ropsten.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
-      accounts: [`0x${ROPSTEN_PRIVATE_KEY}`],
-    },
+    }
   },
   typechain: {
     outDir: 'build/types',
