@@ -14,20 +14,24 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
 
     event MemberRevoked(address member);
 
-    event TokenUriUpdated(uint256 tokenId, string tokenURI);
+    event BaseTokenUriUpdated(string baseTokenURI);
+
+    event TokenUriLocked(uint256 tokenId);
 
     event Minted(uint256 tokenId, address member, string tokenURI);
 
     // if a token's URI has been locked or not
-    mapping(uint256 => bool) public tokenURILocked;
+    mapping(uint256 => uint256) public tokenURILocked;
     // signing domain
     string private constant SIGNING_DOMAIN = "BlankNFT";
     // signature version
     string private constant SIGNATURE_VERSION = "1";
+    // Array of _baseURIs
+    string[] private _baseURIs;
     // the percentage of sale that the foundation gets on secondary sales
     uint256 public foundationSalePercentage;
     // gets incremented to placehold for tokens not minted yet
-    uint256 public expectedTokenSupply;
+    uint256 public maxTokenSupply;
     // cost to mint during the public sale
     uint256 public mintPrice;
     // Enables/Disables public minting (without a whitelisted voucher)
@@ -36,25 +40,26 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     address payable public foundationAddress;
     // pending withdrawals by account address
     mapping(address => uint256) pendingWithdrawals;
-    // Number of tokens minted by account
-    mapping(address => uint8) private _memberMintCount;
     // Max number of tokens a member can mint
     uint8 public memberMaxMintCount;
     // current token index
     uint256 public tokenIndex;
 
-    constructor(address payable _foundationAddress, uint256 initialExpectedTokenSupply)
+    constructor(address payable _foundationAddress, uint256 _maxTokenSupply, string memory baseURI)
         ERC721("BlankArt", "BLANK")
         EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION)
     {
         foundationSalePercentage = 50;
         memberMaxMintCount = 5;
         foundationAddress = _foundationAddress;
-        expectedTokenSupply = initialExpectedTokenSupply;
-        require(expectedTokenSupply > 0);
+        maxTokenSupply = _maxTokenSupply;
+        require(maxTokenSupply > 0);
         tokenIndex = 1;
         mintPrice = 0;
         publicMint = false;
+        _baseURIs.push("");
+        // Default the initial index to 1. The lockTokenURI map will default to 0 for all unmapped tokens.
+        _baseURIs.push(baseURI);
     }
 
     /// @notice Represents a voucher to claim any un-minted NFT (up to memberMaxMintCount), which has not yet been recorded into the blockchain. A signed voucher can be redeemed for real NFTs using the redeemVoucher function.
@@ -86,20 +91,34 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     }
 
     function isMember(address account) external view returns (bool) {
-        return (_memberMintCount[account] > 0);
+        return (balanceOf(account) > 0);
     }
 
+    function addBaseURI(string calldata baseURI) external onlyFoundation {
+        _baseURIs.push(baseURI);
+        emit BaseTokenUriUpdated(baseURI);
+    }
+
+    // Overridden. Sets the TokenURI based on the locked version.
     function tokenURI(uint256 tokenId)
         public
         view
         override(ERC721, ERC721URIStorage)
         returns (string memory)
     {
-        return super.tokenURI(tokenId);
+        string memory _base = "";
+        require(_exists(tokenId), "ERC721URIStorage: URI query for nonexistent token");
+
+        if(tokenURILocked[tokenId] > 0)
+            _base = _baseURIs[tokenURILocked[tokenId]];
+        else
+            _base = _baseURIs[_baseURIs.length -1];
+
+        return string(abi.encodePacked(_base, Strings.toString(tokenId)));
     }
 
     function _checkMemberMintCount(address account) internal view {
-        if (_memberMintCount[account] >= memberMaxMintCount) {
+        if (balanceOf(account) >= memberMaxMintCount) {
             revert(
                 string(
                     abi.encodePacked(
@@ -121,24 +140,16 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         emit FoundationAddressUpdated(newFoundationAddress);
     }
 
-    // Allow the foundation to update a token's URI if it's not locked yet (for updating art post mint)
-    function updateTokenURI(uint256 tokenId, string calldata newTokenURI) external onlyFoundation {
+    // Locks a token's URI from being updated. Only callable by the token owner.
+    function lockTokenURI(uint256 tokenId) external {
         // ensure that this token exists
-        require(_exists(tokenId));
-        // ensure that the URI for this token is not locked yet
-        require(tokenURILocked[tokenId] == false);
-        // update the token URI
-        super._setTokenURI(tokenId, newTokenURI);
-
-        emit TokenUriUpdated(tokenId, newTokenURI);
-    }
-
-    // Locks a token's URI from being updated
-    function lockTokenURI(uint256 tokenId) external onlyFoundation {
-        // ensure that this token exists
-        require(_exists(tokenId));
+        require(_exists(tokenId), "ERC721URIStorage: URI query for nonexistent token");
+        // ensure that the token is owned by the caller
+        require(ownerOf(tokenId) == msg.sender, "Invalid: Only the owner can lock their token");
         // lock this token's URI from being changed
-        tokenURILocked[tokenId] = true;
+        tokenURILocked[tokenId] = _baseURIs.length-1;
+
+        emit TokenUriLocked(tokenId);
     }
 
     // Updates the mintPrice
@@ -157,7 +168,6 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         _checkMemberMintCount(owner);
         super._safeMint(owner, tokenId);
         tokenIndex++;
-        _memberMintCount[owner]++;
         string memory tokenUri = super.tokenURI(tokenId);
         emit Minted(tokenId, owner, tokenUri);
         return tokenId;
@@ -177,8 +187,13 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         require(payable(signer) == foundationAddress, "Signature invalid or unauthorized");
 
         require(
-            _memberMintCount[voucher.redeemerAddress] + amount <= memberMaxMintCount,
+            balanceOf(voucher.redeemerAddress) + amount <= memberMaxMintCount,
             "Amount is more than the minting limit"
+        );
+
+        require(
+            tokenIndex + amount <= maxTokenSupply + 1,
+            "All tokens have already been minted"
         );
 
         // make sure that the redeemer is paying enough to cover the buyer's cost
@@ -203,8 +218,13 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     {
         require(publicMint, "Public minting is not active.");
         require(
-            _memberMintCount[msg.sender] + amount <= memberMaxMintCount,
+            balanceOf(msg.sender) + amount <= memberMaxMintCount,
             "Amount is more than the minting limit"
+        );
+        
+        require(
+            tokenIndex + amount <= maxTokenSupply + 1,
+            "All tokens have already been minted"
         );
 
         // make sure that the caller is paying enough to cover the mintPrice

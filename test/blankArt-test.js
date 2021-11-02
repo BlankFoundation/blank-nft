@@ -5,11 +5,18 @@ const { LazyMinter } = require('../lib');
 describe("BlankArt", function () {
   let blankArt;
 
-  async function deploy() {
+  // Sample ArWeave URIs for testing only. Can replace with legitimate hashes once created.
+  let arWeaveURI = new Array();
+  arWeaveURI.push("ar://123456789/");
+  arWeaveURI.push("ar://987654321/");
+
+  async function deploy(maxTokenSupply) {
       const [minter, redeemer, _] = await ethers.getSigners()
 
       let factory = await ethers.getContractFactory("BlankArt")
-      const contract = await factory.deploy(minter.address, 10000)
+      if(isNaN(maxTokenSupply))
+        maxTokenSupply = 10000
+      const contract = await factory.deploy(minter.address, maxTokenSupply, arWeaveURI[0])
 
       // the redeemerContract is an instance of the contract that's wired up to the redeemer's signing key
       const redeemerFactory = factory.connect(redeemer)
@@ -76,6 +83,112 @@ describe("BlankArt", function () {
 
     await expect(contract.connect(addr2).redeemVoucher(1, voucher))
       .to.be.revertedWith("Voucher is for a different wallet address");
+  });
+
+  it("Should not allow a token to be locked by the Foundation address", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
+
+    await expect(redeemerContract.redeemVoucher(3, voucher))
+      .to.emit(contract, 'Transfer');
+
+    //Verify tokenURI is correct
+    expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[0] + "1");
+
+    //Lock the tokenURIs
+    await expect(contract.connect(minter).lockTokenURI(2)).to.be.revertedWith("Invalid: Only the owner can lock their token");
+
+  });
+
+  it("Should not allow a token to be locked by another address", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
+
+    await expect(redeemerContract.redeemVoucher(3, voucher))
+      .to.emit(contract, 'Transfer');
+
+    //Verify tokenURI is correct
+    expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[0] + "1");
+
+    //Lock the tokenURIs
+    await expect(contract.connect(addr2).lockTokenURI(2)).to.be.revertedWith("Invalid: Only the owner can lock their token");
+
+  });
+
+  it("Should allow the Foundation to evolve the NFTs", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
+
+    await expect(redeemerContract.redeemVoucher(3, voucher))
+      .to.emit(contract, 'Transfer');
+
+    //Verify tokenURIs are correct (v1)
+    expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[0] + "1");
+
+    //Evolve the NFTs
+    await contract.connect(minter).addBaseURI(arWeaveURI[1]);
+
+    //Verify tokenURIs are correct (v2)
+    expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[1] + "1");
+
+  });
+
+  it("Should not allow an address other than the Foundation to evolve the NFTs", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
+
+    await expect(redeemerContract.redeemVoucher(3, voucher))
+      .to.emit(contract, 'Transfer');
+
+    //Verify tokenURIs are correct (v1)
+    expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[0] + "1");
+
+    //Evolve the NFTs
+    await expect(contract.connect(redeemer).addBaseURI(arWeaveURI[1])).to.be.revertedWith("Only the foundation can make this call");
+
+  });
+
+  it("Should return the correct tokenURIs for both locked and unlocked NFTs", async function() {
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
+
+    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const voucher = await lazyMinter.createVoucher(redeemer.address)
+
+    await expect(redeemerContract.redeemVoucher(3, voucher))
+      .to.emit(contract, 'Transfer');
+
+    //Verify all tokenURIs are correct (v1)
+    expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[0] + "1");
+
+    expect(await redeemerContract.tokenURI(2)).to.equal(arWeaveURI[0] + "2");
+
+    expect(await redeemerContract.tokenURI(3)).to.equal(arWeaveURI[0] + "3");
+
+    //Lock one of the tokenURIs
+    await redeemerContract.lockTokenURI(2);
+
+    //Evolve the NFTs
+    await contract.addBaseURI(arWeaveURI[1]);
+
+    // Expect to be on the v2 URI
+    expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[1] + "1");
+
+    // Expect to be locked back to the v1 URI
+    expect(await redeemerContract.tokenURI(2)).to.equal(arWeaveURI[0] + "2");
+
+    // Expect to be on the v2 URI
+    expect(await redeemerContract.tokenURI(3)).to.equal(arWeaveURI[1] + "3");
+    
   });
 
   it("should allow you to check membership if an address has minted", async () => {
@@ -206,11 +319,6 @@ describe("BlankArt", function () {
 
     expect(await contract.foundationAddress()).to.equal(minter.address);
   });
-
-  it.skip("should allow you to update the tokenURI if it is not locked", async () => {
-    // updateTokenURI
-
-  })
 
   it("should allow you to update the mint price", async () => {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
@@ -421,6 +529,49 @@ describe("BlankArt", function () {
 
     await expect(contract.connect(addr2).mint(5, { value: payment }))
       .to.be.revertedWith('Insufficient funds to mint')
+  });
+
+  it("Should not allow more than the maxSupply of NFTs to be minted", async function() {
+    // Set the max to 25 to allow the test to complete
+    const testMaxToken = 25;
+    const { contract, redeemerContract, redeemer, minter } = await deploy(testMaxToken)
+    const [_, __, addr2, addr3, addr4, addr5, addr6, addr7] = await ethers.getSigners()
+    const price = ethers.constants.WeiPerEther // charge 1 Eth    
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.togglePublicMint();
+
+    expect(await contract.publicMint()).to.equal(true);    
+
+    expect(await contract.mintPrice()).to.equal(0);
+
+    await contract.updateMintPrice(price);
+
+    expect(await contract.mintPrice()).to.equal(price);
+
+    const payment = price.mul(5);
+    const maxSupply = await contract.maxTokenSupply();
+
+    // Mint 5 (max allowed) NFTs per address until all (25) have been minted.
+    await expect(contract.connect(addr2).mint(5, { value: payment }))
+      .to.emit(contract, 'Transfer')  // transfer from null address to minter
+
+    await expect(contract.connect(addr3).mint(5, { value: payment }))
+    .to.emit(contract, 'Transfer')  // transfer from null address to minter
+
+    await expect(contract.connect(addr4).mint(5, { value: payment }))
+    .to.emit(contract, 'Transfer')  // transfer from null address to minter
+
+    await expect(contract.connect(addr5).mint(5, { value: payment }))
+    .to.emit(contract, 'Transfer')  // transfer from null address to minter
+
+    await expect(contract.connect(addr6).mint(5, { value: payment }))
+    .to.emit(contract, 'Transfer')  // transfer from null address to minter
+    
+    // Attempt to mint an extra NFT
+    await expect(contract.connect(addr7).mint(1, { value: payment }))
+      .to.be.revertedWith('All tokens have already been minted')
   });
 
 });
