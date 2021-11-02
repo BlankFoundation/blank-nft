@@ -39,6 +39,7 @@ describe("BlankArt", function () {
     await expect(redeemerContract.redeemVoucher(1, voucher))
       .to.emit(contract, 'Transfer')  // transfer from null address to minter
   });
+
   it("Should redeem 5 free Blank NFTs from a signed voucher", async function() {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
 
@@ -49,6 +50,7 @@ describe("BlankArt", function () {
       .to.emit(contract, 'Transfer')  // transfer from null address to minter
       //.withArgs('0x0000000000000000000000000000000000000000', redeemer.address, contract.tokenIndex - 1)
   });
+
   it("Should error on an attempt to mint more than 5 Blank NFTs from a signed voucher", async function() {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
 
@@ -59,6 +61,7 @@ describe("BlankArt", function () {
     await expect(redeemerContract.redeemVoucher(amount, voucher))
       .to.be.revertedWith("Amount is more than the minting limit");
   });
+
   it("Should error on an attempt to mint twice for more than max amount total", async function() {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
 
@@ -74,8 +77,9 @@ describe("BlankArt", function () {
     await expect(redeemerContract.redeemVoucher(4, voucher))
       .to.be.revertedWith("Amount is more than the minting limit");
   });
+
   it("Should error on an attempt to redeem a voucher from the wrong address", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemer, minter } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
@@ -87,7 +91,7 @@ describe("BlankArt", function () {
 
   it("Should not allow a token to be locked by the Foundation address", async function() {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
-    const [_, __, addr2] = await ethers.getSigners()
+    await ethers.getSigners()
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
     const voucher = await lazyMinter.createVoucher(redeemer.address)
@@ -99,8 +103,8 @@ describe("BlankArt", function () {
     expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[0] + "1");
 
     //Lock the tokenURIs
-    await expect(contract.connect(minter).lockTokenURI(2)).to.be.revertedWith("Invalid: Only the owner can lock their token");
-
+    await expect(contract.connect(minter).lockTokenURI(2))
+      .to.be.revertedWith("Invalid: Only the owner can lock their token");
   });
 
   it("Should not allow a token to be locked by another address", async function() {
@@ -117,8 +121,8 @@ describe("BlankArt", function () {
     expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[0] + "1");
 
     //Lock the tokenURIs
-    await expect(contract.connect(addr2).lockTokenURI(2)).to.be.revertedWith("Invalid: Only the owner can lock their token");
-
+    await expect(contract.connect(addr2).lockTokenURI(2))
+      .to.be.revertedWith("Invalid: Only the owner can lock their token");
   });
 
   it("Should allow the Foundation to evolve the NFTs", async function() {
@@ -154,8 +158,8 @@ describe("BlankArt", function () {
     expect(await redeemerContract.tokenURI(1)).to.equal(arWeaveURI[0] + "1");
 
     //Evolve the NFTs
-    await expect(contract.connect(redeemer).addBaseURI(arWeaveURI[1])).to.be.revertedWith("Only the foundation can make this call");
-
+    await expect(contract.connect(redeemer).addBaseURI(arWeaveURI[1]))
+      .to.be.revertedWith("Only the foundation can make this call");
   });
 
   it("Should return the correct tokenURIs for both locked and unlocked NFTs", async function() {
@@ -203,7 +207,8 @@ describe("BlankArt", function () {
 
     expect(await contract.isMember(redeemer.address)).to.equal(true);
   });
-    it("Should fail to redeem an NFT voucher that's signed by an unauthorized account", async function() {
+
+  it("Should fail to redeem an NFT voucher that's signed by an unauthorized account", async function() {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
 
     const signers = await ethers.getSigners()
@@ -244,6 +249,7 @@ describe("BlankArt", function () {
     await expect(redeemerContract.redeemVoucher(1, voucher))
       .to.be.revertedWith('Signature invalid or unauthorized')
   });
+
   it("Should fail to redeem if payment is < minPrice", async function() {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
 
@@ -277,6 +283,7 @@ describe("BlankArt", function () {
     // minter should now have zero available
     expect(await contract.availableToWithdraw()).to.equal(0)
   })
+
   it("Should withdraw for the correct amount of payment", async function() {
     const { contract, redeemerContract, redeemer, minter } = await deploy()
 
@@ -298,8 +305,9 @@ describe("BlankArt", function () {
     // minter should now have zero available
     expect(await contract.availableToWithdraw()).to.equal(0)
   })
+
   it("should allow you to update the foundation address", async () => {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemer, minter } = await deploy()
 
     expect(await contract.foundationAddress()).to.equal(minter.address);
 
@@ -309,9 +317,8 @@ describe("BlankArt", function () {
   });
 
   it("should not allow you to update the foundation address from the wrong sender", async () => {
-
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
-    const [_, __, addr2] = await ethers.getSigners()
+    const { contract, redeemer, minter } = await deploy()
+    await ethers.getSigners()
 
     expect(await contract.foundationAddress()).to.equal(minter.address);
 
@@ -332,8 +339,7 @@ describe("BlankArt", function () {
   });
 
   it("should not allow you to update the mint price from the wrong sender", async () => {
-
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
     const price = ethers.constants.WeiPerEther // charge 1 Eth
 
@@ -345,13 +351,13 @@ describe("BlankArt", function () {
   });
   
   it("Should not allow you to mint up to 5 Blank NFTs if public minting is not enabled", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { redeemerContract } = await deploy()
 
     await expect(redeemerContract.mint(5)).to.be.revertedWith("Public minting is not active.");    
   });
 
   it("should allow the foundation to update the public mint period", async () => {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
 
     expect(await contract.publicMint()).to.equal(false);
 
@@ -366,7 +372,7 @@ describe("BlankArt", function () {
 
   it("should not allow you to update the public mint period from the wrong sender", async () => {
 
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
 
     expect(await contract.publicMint()).to.equal(false);
@@ -377,7 +383,7 @@ describe("BlankArt", function () {
   });
  
   it("Should allow anyone to mint one Blank NFT for free if public minting is enabled", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
 
     expect(await contract.publicMint()).to.equal(false);
@@ -392,7 +398,7 @@ describe("BlankArt", function () {
   });
 
   it("Should allow anyone to mint up to 5 Blank NFTs for free if public minting is enabled", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
 
     expect(await contract.publicMint()).to.equal(false);
@@ -407,7 +413,7 @@ describe("BlankArt", function () {
   });
 
   it("Should error on an attempt to mint more than 5 Blank NFTs during public minting", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
 
     expect(await contract.publicMint()).to.equal(false);
@@ -420,7 +426,7 @@ describe("BlankArt", function () {
       .to.be.revertedWith("Amount is more than the minting limit");
   });
   it("Should error on an attempt to mint twice for more than max amount total", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
 
     expect(await contract.publicMint()).to.equal(false);
@@ -438,7 +444,7 @@ describe("BlankArt", function () {
   });
   
   it("Should allow anyone to mint one Blank NFT if public minting is enabled, mint price is set and payment is conveyed", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
     const price = ethers.constants.WeiPerEther // charge 1 Eth
 
@@ -462,7 +468,7 @@ describe("BlankArt", function () {
   });
 
   it("Should allow anyone to mint 5 Blank NFTs if public minting is enabled, mint price is set and payment is conveyed", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
     const price = ethers.constants.WeiPerEther // charge 1 Eth
 
@@ -486,7 +492,7 @@ describe("BlankArt", function () {
   });
 
   it("Should not allow anyone to mint one Blank NFT if public minting is enabled and mint price is set but payment is not sufficient", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
     const price = ethers.constants.WeiPerEther // charge 1 Eth
 
@@ -509,7 +515,7 @@ describe("BlankArt", function () {
   });
 
   it("Should not allow anyone to mint 5 Blank NFT if public minting is enabled and mint price is set but payment is not sufficient", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
     const price = ethers.constants.WeiPerEther // charge 1 Eth
 
@@ -534,7 +540,7 @@ describe("BlankArt", function () {
   it("Should not allow more than the maxSupply of NFTs to be minted", async function() {
     // Set the max to 25 to allow the test to complete
     const testMaxToken = 25;
-    const { contract, redeemerContract, redeemer, minter } = await deploy(testMaxToken)
+    const { contract } = await deploy(testMaxToken)
     const [_, __, addr2, addr3, addr4, addr5, addr6, addr7] = await ethers.getSigners()
     const price = ethers.constants.WeiPerEther // charge 1 Eth    
 

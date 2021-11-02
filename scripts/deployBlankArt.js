@@ -1,8 +1,16 @@
 async function main() {
-  const artFactory = await ethers.getContractFactory('BlankArt')
-  const blankArt = await artFactory.deploy('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266', 10000)
+  const [deployer] = await ethers.getSigners();
 
-  console.log('Contract deployed to address:', blankArt.address)
+  console.log("Deploying contracts with the account:", deployer.address);
+
+  console.log("Account balance:", (await deployer.getBalance()).toString());
+
+  const BlankArt = await ethers.getContractFactory("BlankArt")
+  const blankArt = await BlankArt.deploy(deployer.address, 10000);
+
+  // Start deployment, returning a promise that resolves to a contract object
+  await blankArt.deployed();
+  console.log("Contract deployed to address:", blankArt.address);
 }
 
 main()
