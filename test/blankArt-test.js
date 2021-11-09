@@ -11,7 +11,7 @@ describe("BlankArt", function () {
   arWeaveURI.push("https://arweave.net/hash2/");
 
   const voucherExpiration = 86400; //Voucher expires in 24 hours.
-  const expiration = (Math.floor( Date.now() / 1000 )+voucherExpiration);  
+  const expiration = (Math.floor( Date.now() / 1000 )+voucherExpiration);
 
   async function deploy(maxTokenSupply) {
       const [minter, redeemer, _] = await ethers.getSigners()
@@ -34,12 +34,12 @@ describe("BlankArt", function () {
   }
 
   it("Should redeem one free Blank NFT from a signed voucher", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()    
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
-        
+
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration);
-    
+
     await expect(redeemerContract.redeemVoucher(1, voucher))
       .to.emit(contract, 'Transfer')  // transfer from null address to minter
   });
@@ -165,15 +165,15 @@ describe("BlankArt", function () {
   });
 
   it("Should error on an attempt to redeem a voucher while redemption is paused", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()    
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
-        
+
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration);
-    
+
     // Pause Redemption
     await contract.toggleActivation();
-    
+
     await expect(redeemerContract.redeemVoucher(1, voucher))
       .to.be.revertedWith("Voucher redemption is not currently active");
   });
@@ -292,7 +292,7 @@ describe("BlankArt", function () {
 
     // Expect to be on the v2 URI
     expect(await redeemerContract.tokenURI(3)).to.equal(arWeaveURI[1] + "3.json");
-    
+
   });
 
   it("should allow you to check membership if an address has minted", async () => {
@@ -351,11 +351,11 @@ describe("BlankArt", function () {
   });
 
   it("Should fail to redeem an NFT voucher that's expired", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()    
+    const { contract, redeemerContract, redeemer, minter } = await deploy()
 
     const lazyMinter = new LazyMinter({ contract, signer: minter })
 
-    let expired = (Math.floor( Date.now() / 1000 )-1);         
+    let expired = (Math.floor( Date.now() / 1000 )-1);
     const voucher = await lazyMinter.createVoucher(redeemer.address, expired);
 
     await expect(redeemerContract.redeemVoucher(1, voucher))
@@ -461,11 +461,11 @@ describe("BlankArt", function () {
 
     expect(await contract.mintPrice()).to.equal(0);
   });
-  
+
   it("Should not allow you to mint up to 5 Blank NFTs if public minting is not enabled", async function() {
     const { redeemerContract } = await deploy()
 
-    await expect(redeemerContract.mint(5)).to.be.revertedWith("Public minting is not active.");    
+    await expect(redeemerContract.mint(5)).to.be.revertedWith("Public minting is not active.");
   });
 
   it("should allow the foundation to update the public mint period", async () => {
@@ -476,7 +476,7 @@ describe("BlankArt", function () {
     await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(true);
-    
+
     await contract.togglePublicMint();
 
     expect(await contract.publicMint()).to.equal(false);
@@ -493,7 +493,7 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
   });
- 
+
   it("Should allow anyone to mint one Blank NFT for free if public minting is enabled", async function() {
     const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
@@ -574,7 +574,7 @@ describe("BlankArt", function () {
       await expect(contract.connect(addr2).mint(4))
       .to.be.revertedWith("Amount is more than the minting limit");
   });
-  
+
   it("Should allow anyone to mint one Blank NFT if public minting is enabled, mint price is set and payment is conveyed", async function() {
     const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
@@ -584,7 +584,7 @@ describe("BlankArt", function () {
 
     await contract.togglePublicMint();
 
-    expect(await contract.publicMint()).to.equal(true);    
+    expect(await contract.publicMint()).to.equal(true);
 
     expect(await contract.mintPrice()).to.equal(0);
 
@@ -608,7 +608,7 @@ describe("BlankArt", function () {
 
     await contract.togglePublicMint();
 
-    expect(await contract.publicMint()).to.equal(true);    
+    expect(await contract.publicMint()).to.equal(true);
 
     expect(await contract.mintPrice()).to.equal(0);
 
@@ -632,7 +632,7 @@ describe("BlankArt", function () {
 
     await contract.togglePublicMint();
 
-    expect(await contract.publicMint()).to.equal(true);    
+    expect(await contract.publicMint()).to.equal(true);
 
     expect(await contract.mintPrice()).to.equal(0);
 
@@ -655,7 +655,7 @@ describe("BlankArt", function () {
 
     await contract.togglePublicMint();
 
-    expect(await contract.publicMint()).to.equal(true);    
+    expect(await contract.publicMint()).to.equal(true);
 
     expect(await contract.mintPrice()).to.equal(0);
 
@@ -674,13 +674,13 @@ describe("BlankArt", function () {
     const testMaxToken = 25;
     const { contract } = await deploy(testMaxToken)
     const [_, __, addr2, addr3, addr4, addr5, addr6, addr7] = await ethers.getSigners()
-    const price = ethers.constants.WeiPerEther // charge 1 Eth    
+    const price = ethers.constants.WeiPerEther // charge 1 Eth
 
     expect(await contract.publicMint()).to.equal(false);
 
     await contract.togglePublicMint();
 
-    expect(await contract.publicMint()).to.equal(true);    
+    expect(await contract.publicMint()).to.equal(true);
 
     expect(await contract.mintPrice()).to.equal(0);
 
@@ -706,7 +706,7 @@ describe("BlankArt", function () {
 
     await expect(contract.connect(addr6).mint(5, { value: payment }))
     .to.emit(contract, 'Transfer')  // transfer from null address to minter
-    
+
     // Attempt to mint an extra NFT
     await expect(contract.connect(addr7).mint(1, { value: payment }))
       .to.be.revertedWith('All tokens have already been minted')
@@ -720,7 +720,7 @@ describe("BlankArt", function () {
     await contract.toggleActivation();
 
     expect(await contract.active()).to.equal(false);
-    
+
     await contract.toggleActivation();
 
     expect(await contract.active()).to.equal(true);
@@ -746,7 +746,7 @@ describe("BlankArt", function () {
     await contract.updateMaxMintCount(10);
 
     expect(await contract.memberMaxMintCount()).to.equal(10);
-    
+
     await contract.updateMaxMintCount(7);
 
     expect(await contract.memberMaxMintCount()).to.equal(7);
@@ -764,4 +764,18 @@ describe("BlankArt", function () {
     expect(await contract.memberMaxMintCount()).to.equal(5);
   });
 
+  it("Should emit a valid tokenURI in the Mint event params", async function() {
+    const { contract } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.publicMint()).to.equal(false);
+
+    await contract.togglePublicMint();
+
+    expect(await contract.publicMint()).to.equal(true);
+
+    await expect(contract.connect(addr2).mint(1))
+        .to.emit(contract, 'Minted')
+        .withArgs(1, addr2.address, arWeaveURI[0] + '1');
+  });
 });

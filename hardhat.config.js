@@ -4,6 +4,7 @@ require('hardhat-abi-exporter');
 require('hardhat-gas-reporter');
 require('@typechain/hardhat');
 require('@nomiclabs/hardhat-ethers');
+require("hardhat-tracer");
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
