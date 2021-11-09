@@ -10,10 +10,6 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     // An event whenever the foundation address is updated
     event FoundationAddressUpdated(address foundationAddress);
 
-    event MemberAdded(address member);
-
-    event MemberRevoked(address member);
-
     event BaseTokenUriUpdated(string baseTokenURI);
 
     event TokenUriLocked(uint256 tokenId);
@@ -108,7 +104,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         emit BaseTokenUriUpdated(baseURI);
     }
 
-    // Overridden. Sets the TokenURI based on the locked version.
+    // Overridden. Gets the TokenURI based on the locked version.
     function tokenURI(uint256 tokenId)
         public
         view
@@ -166,20 +162,20 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         // Update the mintPrice
         mintPrice = price;
     }
-    
+
         // Updates the memberMaxMintCount
     function updateMaxMintCount(uint8 _maxMint) external onlyFoundation {
         require(_maxMint > 0,  "Max mint cannot be zero");
         memberMaxMintCount = _maxMint;
-    }   
+    }
 
         // Toggle the value of publicMint
-    function togglePublicMint() external onlyFoundation {        
+    function togglePublicMint() external onlyFoundation {
         publicMint = !publicMint;
     }
 
     // Pause minting
-    function toggleActivation() external onlyFoundation {        
+    function toggleActivation() external onlyFoundation {
         active = !active;
     }
 
@@ -188,7 +184,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         _checkMemberMintCount(owner);
         super._safeMint(owner, tokenId);
         tokenIndex++;
-        string memory tokenUri = super.tokenURI(tokenId);
+        string memory tokenUri = tokenURI(tokenId);
         emit Minted(tokenId, owner, tokenUri);
         return tokenId;
     }
@@ -204,7 +200,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         address signer = _verify(voucher);
         // make sure caller is the redeemer
         require(msg.sender == voucher.redeemerAddress, "Voucher is for a different wallet address");
-                
+
        // make sure voucher has not expired.
         require(block.timestamp <= voucher.expiration, "Voucher has expired");
 
@@ -256,7 +252,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
             balanceOf(msg.sender) + amount <= memberMaxMintCount,
             "Amount is more than the minting limit"
         );
-        
+
         require(
             tokenIndex + amount <= maxTokenSupply + 1,
             "All tokens have already been minted"
