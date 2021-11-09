@@ -38,6 +38,8 @@ describe("BlankArt", function () {
 
     await expect(redeemerContract.redeemVoucher(1, voucher))
       .to.emit(contract, 'Transfer')  // transfer from null address to minter
+      .to.emit(contract, 'Minted')
+      .withArgs(1, redeemer.address, arWeaveURI[0] + '1');
   });
 
   it("Should redeem 5 free Blank NFTs from a signed voucher", async function() {
@@ -48,7 +50,9 @@ describe("BlankArt", function () {
 
     await expect(redeemerContract.redeemVoucher(5, voucher))
       .to.emit(contract, 'Transfer')  // transfer from null address to minter
-      //.withArgs('0x0000000000000000000000000000000000000000', redeemer.address, contract.tokenIndex - 1)
+      .to.emit(contract, 'Minted')
+      .withArgs(1, redeemer.address, arWeaveURI[0] + '1')
+      .withArgs(2, redeemer.address, arWeaveURI[0] + '2')
   });
 
   it("Should error on an attempt to mint more than 5 Blank NFTs from a signed voucher", async function() {
