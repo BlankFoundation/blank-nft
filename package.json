@@ -8,6 +8,7 @@
     "typechain": "hardhat typechain",
     "test": "hardhat test",
     "test:gas": "REPORT_GAS=true hardhat test",
+    "test:event-logs": "hardhat test --logs",
     "contract-sizes": "yarn run hardhat size-contracts",
     "deploy": "hardhat run scripts/deployBlankArt.js",
     "deploy:hardhat": "yarn deploy -- --network hardat --force",
