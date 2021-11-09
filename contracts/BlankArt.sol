@@ -34,6 +34,8 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     uint256 public maxTokenSupply;
     // cost to mint during the public sale
     uint256 public mintPrice;
+    // Enables/Disables voucher redemption
+    bool public active;
     // Enables/Disables public minting (without a whitelisted voucher)
     bool public publicMint;
     // the address of the platform (for receiving commissions and royalties)
@@ -44,6 +46,8 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     uint8 public memberMaxMintCount;
     // current token index
     uint256 public tokenIndex;
+    // pending withdrawals by account address
+    mapping(bytes32 => bool) private voucherClaimed;
 
     constructor(address payable _foundationAddress, uint256 _maxTokenSupply, string memory baseURI)
         ERC721("BlankArt", "BLANK")
@@ -60,14 +64,19 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         _baseURIs.push("");
         // Default the initial index to 1. The lockTokenURI map will default to 0 for all unmapped tokens.
         _baseURIs.push(baseURI);
+        active = true;
     }
 
     /// @notice Represents a voucher to claim any un-minted NFT (up to memberMaxMintCount), which has not yet been recorded into the blockchain. A signed voucher can be redeemed for real NFTs using the redeemVoucher function.
     struct BlankNFTVoucher {
         /// @notice address of intended redeemer
         address redeemerAddress;
+        /// @notice Expiration of the voucher, expressed in seconds since the Unix epoch.
+        uint256 expiration;
         /// @notice The minimum price (in wei) that the NFT creator is willing to accept for the initial sale of this NFT.
         uint256 minPrice;
+        /// @notice amount of tokens the voucher can claim.
+        uint16 tokenCount;
         /// @notice the EIP-712 signature of all other fields in the NFTVoucher struct. For a voucher to be valid, it must be signed by an account with the MINTER_ROLE.
         bytes signature;
     }
@@ -114,7 +123,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         else
             _base = _baseURIs[_baseURIs.length -1];
 
-        return string(abi.encodePacked(_base, Strings.toString(tokenId)));
+        return string(abi.encodePacked(_base, Strings.toString(tokenId), '.json'));
     }
 
     function _checkMemberMintCount(address account) internal view {
@@ -158,9 +167,20 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         mintPrice = price;
     }
     
-    // Toggle the value of publicMint
+        // Updates the memberMaxMintCount
+    function updateMaxMintCount(uint8 _maxMint) external onlyFoundation {
+        require(_maxMint > 0,  "Max mint cannot be zero");
+        memberMaxMintCount = _maxMint;
+    }   
+
+        // Toggle the value of publicMint
     function togglePublicMint() external onlyFoundation {        
         publicMint = !publicMint;
+    }
+
+    // Pause minting
+    function toggleActivation() external onlyFoundation {        
+        active = !active;
     }
 
     function _mintBlank(address owner) private returns (uint256) {
@@ -176,12 +196,17 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     function redeemVoucher(uint256 amount, BlankNFTVoucher calldata voucher)
         public
         payable
-        returns (uint256[5] memory)
+        returns (uint256[] memory)
     {
+        // make sure voucher redemption period is active
+        require(active, "Voucher redemption is not currently active");
         // make sure signature is valid and get the address of the signer
         address signer = _verify(voucher);
         // make sure caller is the redeemer
         require(msg.sender == voucher.redeemerAddress, "Voucher is for a different wallet address");
+                
+       // make sure voucher has not expired.
+        require(block.timestamp <= voucher.expiration, "Voucher has expired");
 
         // make sure that the signer is the foundation address
         require(payable(signer) == foundationAddress, "Signature invalid or unauthorized");
@@ -199,14 +224,24 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         // make sure that the redeemer is paying enough to cover the buyer's cost
         require(msg.value >= (voucher.minPrice * amount), "Insufficient funds to redeem");
 
+        require(
+            amount <= voucher.tokenCount,
+            "Amount is more than the voucher allows"
+        );
+
+        // make sure voucher has not already been claimed. If true, it HAS been claimed
+        require(!voucherClaimed[_hash(voucher)], "Voucher has already been claimed");
+
         // assign the token directly to the redeemer
-        uint256[5] memory tokenIds;
+        uint256[] memory tokenIds = new uint256[](amount);
         for (uint256 num = 0; num < amount; num++) {
             uint256 tokenId = _mintBlank(voucher.redeemerAddress);
             tokenIds[num] = tokenId;
         }
         // record payment to signer's withdrawal balance
         pendingWithdrawals[signer] += msg.value;
+        voucherClaimed[_hash(voucher)] = true;
+
         return tokenIds;
     }
 
@@ -214,9 +249,9 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     function mint(uint256 amount)
         public
         payable
-        returns (uint256[5] memory)
+        returns (uint256[] memory)
     {
-        require(publicMint, "Public minting is not active.");
+        require(publicMint && active, "Public minting is not active.");
         require(
             balanceOf(msg.sender) + amount <= memberMaxMintCount,
             "Amount is more than the minting limit"
@@ -231,7 +266,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         require(msg.value >= (mintPrice * amount), "Insufficient funds to mint");
 
         // assign the token directly to the redeemer
-        uint256[5] memory tokenIds;
+        uint256[] memory tokenIds = new uint256[](amount);
         for (uint256 num = 0; num < amount; num++) {
             uint256 tokenId = _mintBlank(msg.sender);
             tokenIds[num] = tokenId;
@@ -264,9 +299,11 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
             _hashTypedDataV4(
                 keccak256(
                     abi.encode(
-                        keccak256("BlankNFTVoucher(address redeemerAddress,uint256 minPrice)"),
+                        keccak256("BlankNFTVoucher(address redeemerAddress,uint256 expiration,uint256 minPrice,uint16 tokenCount)"),
                         voucher.redeemerAddress,
-                        voucher.minPrice
+                        voucher.expiration,
+                        voucher.minPrice,
+                        voucher.tokenCount
                     )
                 )
             );
