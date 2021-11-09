@@ -45,10 +45,11 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     // pending withdrawals by account address
     mapping(bytes32 => bool) private voucherClaimed;
 
-    constructor(address payable _foundationAddress, uint256 _maxTokenSupply, string memory baseURI)
-        ERC721("BlankArt", "BLANK")
-        EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION)
-    {
+    constructor(
+        address payable _foundationAddress,
+        uint256 _maxTokenSupply,
+        string memory baseURI
+    ) ERC721("BlankArt", "BLANK") EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION) {
         foundationSalePercentage = 50;
         memberMaxMintCount = 5;
         foundationAddress = _foundationAddress;
@@ -114,12 +115,10 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         string memory _base = "";
         require(_exists(tokenId), "ERC721URIStorage: URI query for nonexistent token");
 
-        if(tokenURILocked[tokenId] > 0)
-            _base = _baseURIs[tokenURILocked[tokenId]];
-        else
-            _base = _baseURIs[_baseURIs.length -1];
+        if (tokenURILocked[tokenId] > 0) _base = _baseURIs[tokenURILocked[tokenId]];
+        else _base = _baseURIs[_baseURIs.length - 1];
 
-        return string(abi.encodePacked(_base, Strings.toString(tokenId), '.json'));
+        return string(abi.encodePacked(_base, Strings.toString(tokenId), ".json"));
     }
 
     function _checkMemberMintCount(address account) internal view {
@@ -152,7 +151,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         // ensure that the token is owned by the caller
         require(ownerOf(tokenId) == msg.sender, "Invalid: Only the owner can lock their token");
         // lock this token's URI from being changed
-        tokenURILocked[tokenId] = _baseURIs.length-1;
+        tokenURILocked[tokenId] = _baseURIs.length - 1;
 
         emit TokenUriLocked(tokenId);
     }
@@ -163,13 +162,13 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         mintPrice = price;
     }
 
-        // Updates the memberMaxMintCount
+    // Updates the memberMaxMintCount
     function updateMaxMintCount(uint8 _maxMint) external onlyFoundation {
-        require(_maxMint > 0,  "Max mint cannot be zero");
+        require(_maxMint > 0, "Max mint cannot be zero");
         memberMaxMintCount = _maxMint;
     }
 
-        // Toggle the value of publicMint
+    // Toggle the value of publicMint
     function togglePublicMint() external onlyFoundation {
         publicMint = !publicMint;
     }
@@ -201,7 +200,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         // make sure caller is the redeemer
         require(msg.sender == voucher.redeemerAddress, "Voucher is for a different wallet address");
 
-       // make sure voucher has not expired.
+        // make sure voucher has not expired.
         require(block.timestamp <= voucher.expiration, "Voucher has expired");
 
         // make sure that the signer is the foundation address
@@ -212,18 +211,12 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
             "Amount is more than the minting limit"
         );
 
-        require(
-            tokenIndex + amount <= maxTokenSupply + 1,
-            "All tokens have already been minted"
-        );
+        require(tokenIndex + amount <= maxTokenSupply + 1, "All tokens have already been minted");
 
         // make sure that the redeemer is paying enough to cover the buyer's cost
         require(msg.value >= (voucher.minPrice * amount), "Insufficient funds to redeem");
 
-        require(
-            amount <= voucher.tokenCount,
-            "Amount is more than the voucher allows"
-        );
+        require(amount <= voucher.tokenCount, "Amount is more than the voucher allows");
 
         // make sure voucher has not already been claimed. If true, it HAS been claimed
         require(!voucherClaimed[_hash(voucher)], "Voucher has already been claimed");
@@ -242,21 +235,14 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     }
 
     // Public mint function. Whitelisted members will utilize redeemVoucher()
-    function mint(uint256 amount)
-        public
-        payable
-        returns (uint256[] memory)
-    {
+    function mint(uint256 amount) public payable returns (uint256[] memory) {
         require(publicMint && active, "Public minting is not active.");
         require(
             balanceOf(msg.sender) + amount <= memberMaxMintCount,
             "Amount is more than the minting limit"
         );
 
-        require(
-            tokenIndex + amount <= maxTokenSupply + 1,
-            "All tokens have already been minted"
-        );
+        require(tokenIndex + amount <= maxTokenSupply + 1, "All tokens have already been minted");
 
         // make sure that the caller is paying enough to cover the mintPrice
         require(msg.value >= (mintPrice * amount), "Insufficient funds to mint");
@@ -295,7 +281,9 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
             _hashTypedDataV4(
                 keccak256(
                     abi.encode(
-                        keccak256("BlankNFTVoucher(address redeemerAddress,uint256 expiration,uint256 minPrice,uint16 tokenCount)"),
+                        keccak256(
+                            "BlankNFTVoucher(address redeemerAddress,uint256 expiration,uint256 minPrice,uint16 tokenCount)"
+                        ),
                         voucher.redeemerAddress,
                         voucher.expiration,
                         voucher.minPrice,

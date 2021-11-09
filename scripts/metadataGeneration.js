@@ -7,28 +7,35 @@
 
 const fs = require('fs')
 
-const PHOTO_BASE_URI = "https://arweave.net/yd87agVBoAGgneJ95QFyj1H_Xkk_CefZwLhYTNH1NlI"
+const PHOTO_BASE_URI = 'https://arweave.net/yd87agVBoAGgneJ95QFyj1H_Xkk_CefZwLhYTNH1NlI'
 
-const OUTPUT_FOLDER = "/tmp/metadata_upload/";
+const OUTPUT_FOLDER = '/tmp/metadata_upload/'
 
 const MAX_TOKEN_ID = 10000
 
 async function main() {
   for (var i = 1; i < MAX_TOKEN_ID + 1; i++) {
     let metadataJson = {
-        "name":  "Blank NFT",
-        "description": "In the beginning, there was Blank.",
-        "tokenId": i,
-        "image": PHOTO_BASE_URI, // in the future you may have to append "+ i.toString() + ".png""
-        "attributes": [{
-          "trait_type": "Generation",
-          "value": "The beginning"
-    }]};
-    fs.writeFileSync(OUTPUT_FOLDER + i.toString() + ".json", JSON.stringify(metadataJson), function(err) {
-      if (err) {
-        console.log(err);
-      }
-    });
+      name: 'Blank NFT',
+      description: 'In the beginning, there was Blank.',
+      tokenId: i,
+      image: PHOTO_BASE_URI, // in the future you may have to append "+ i.toString() + ".png""
+      attributes: [
+        {
+          trait_type: 'Generation',
+          value: 'The beginning',
+        },
+      ],
+    }
+    fs.writeFileSync(
+      OUTPUT_FOLDER + i.toString() + '.json',
+      JSON.stringify(metadataJson),
+      function (err) {
+        if (err) {
+          console.log(err)
+        }
+      },
+    )
   }
 }
 
@@ -36,7 +43,7 @@ async function main() {
 // and properly handle errors.
 main()
   .then(() => process.exit(0))
-  .catch(error => {
-    console.error(error);
-    process.exit(1);
-  });
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
