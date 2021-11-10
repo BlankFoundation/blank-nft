@@ -782,4 +782,29 @@ describe("BlankArt", function () {
         .to.emit(contract, 'Minted')
         .withArgs(1, addr2.address, arWeaveURI[0] + '1.json');
   });
+
+  it("Should emit Initialized event during deploy", async function() {
+    const [minter, redeemer, _] = await ethers.getSigners()
+    let factory = await ethers.getContractFactory("BlankArt")
+    let interface = factory.interface
+
+    const maxTokenSupply = 10000
+    const baseTokenUri = arWeaveURI[0]
+    const controller = minter.address
+
+    const unsignedTx = factory.getDeployTransaction(controller, maxTokenSupply, baseTokenUri);
+    const tx = await factory.signer.sendTransaction(unsignedTx);
+    const receipt = await tx.wait(1)
+    const parsedLog = interface.parseLog(receipt.logs[0])
+
+    expect(parsedLog.name).to.equal('Initialized')
+    expect(parsedLog.signature).to.equal('Initialized(address,string,uint256,uint256,uint256,bool,bool)')
+    expect(parsedLog.args).to.have.property('controller', '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
+    expect(parsedLog.args).to.have.property('baseURI', baseTokenUri)
+    expect(parsedLog.args.mintPrice).to.equal(0)
+    expect(parsedLog.args.maxTokenSupply).to.equal(maxTokenSupply)
+    expect(parsedLog.args.foundationSalePercentage).to.equal(50)
+    expect(parsedLog.args).to.have.property('active', true)
+    expect(parsedLog.args).to.have.property('publicMint', false)
+  })
 });

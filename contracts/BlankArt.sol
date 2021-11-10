@@ -7,6 +7,16 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 
 contract BlankArt is ERC721, EIP712, ERC721URIStorage {
+    event Initialized(
+        address controller,
+        string baseURI,
+        uint256 mintPrice,
+        uint256 maxTokenSupply,
+        uint256 foundationSalePercentage,
+        bool active,
+        bool publicMint
+    );
+
     // An event whenever the foundation address is updated
     event FoundationAddressUpdated(address foundationAddress);
 
@@ -62,6 +72,15 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         // Default the initial index to 1. The lockTokenURI map will default to 0 for all unmapped tokens.
         _baseURIs.push(baseURI);
         active = true;
+        emit Initialized(
+            foundationAddress,
+            baseURI,
+            mintPrice,
+            maxTokenSupply,
+            foundationSalePercentage,
+            active,
+            publicMint
+        );
     }
 
     /// @notice Represents a voucher to claim any un-minted NFT (up to memberMaxMintCount), which has not yet been recorded into the blockchain. A signed voucher can be redeemed for real NFTs using the redeemVoucher function.
