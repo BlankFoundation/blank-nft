@@ -5,7 +5,7 @@ describe("Deploy BlankArt", function () {
   it("Should return the right name and symbol", async function () {
     const [owner, addr1] = await ethers.getSigners();
     const BlankArt = await ethers.getContractFactory("BlankArt");
-    const blankArt = await BlankArt.deploy(owner.address, 10000, "ar://123456789/");
+    const blankArt = await BlankArt.deploy(owner.address, 10000, "ar://123456789/", 1000);
 
     await blankArt.deployed();
     expect(await blankArt.name()).to.equal("BlankArt");

@@ -2,6 +2,10 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { LazyMinter } = require('../lib');
 
+const _INTERFACE_ID_ERC165 = '0x01ffc9a7';
+const _INTERFACE_ID_ROYALTIES_EIP2981 = '0x2a55205a';
+const _INTERFACE_ID_ERC721 = '0x80ac58cd';
+
 describe("BlankArt", function () {
   let blankArt;
 
@@ -9,6 +13,8 @@ describe("BlankArt", function () {
   let arWeaveURI = new Array();
   arWeaveURI.push("https://arweave.net/4usQHuUrIKOMahMjSlgYsPKjOp2wPSP8Z8Qs6NmcT_k/");
   arWeaveURI.push("https://arweave.net/hash2/");
+
+  const royaltyBPS = 1000; //10%.
 
   const voucherExpiration = 86400; //Voucher expires in 24 hours.
   const expiration = (Math.floor( Date.now() / 1000 )+voucherExpiration);
@@ -19,7 +25,7 @@ describe("BlankArt", function () {
       let factory = await ethers.getContractFactory("BlankArt")
       if(isNaN(maxTokenSupply))
         maxTokenSupply = 10000
-      const contract = await factory.deploy(minter.address, maxTokenSupply, arWeaveURI[0])
+      const contract = await factory.deploy(minter.address, maxTokenSupply, arWeaveURI[0], royaltyBPS)
 
       // the redeemerContract is an instance of the contract that's wired up to the redeemer's signing key
       const redeemerFactory = factory.connect(redeemer)
@@ -768,6 +774,97 @@ describe("BlankArt", function () {
     expect(await contract.memberMaxMintCount()).to.equal(5);
   });
 
+  it("should return the correct royaltyInfo", async () => {
+    const { contract, redeemer, minter } = await deploy()
+
+    const salePrice = ethers.constants.WeiPerEther // sell for 1 Eth
+
+    let response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.equal(salePrice.div(10));
+    expect(response[0]).to.equal(minter.address);
+
+    response = await contract.royaltyInfo(1,salePrice.div(10));
+    expect(response[1]).to.equal(salePrice.div(100));
+    expect(response[0]).to.equal(minter.address);
+  });
+
+  it("should allow the foundation to update the royalty information", async () => {
+    const { contract, redeemer, minter } = await deploy()
+
+    const salePrice = ethers.constants.WeiPerEther // sell for 1 Eth
+    const updatedRoyaltyBPS = 500 // 5%
+    
+    let response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.be.equal(salePrice.div(10));
+    expect(response[0]).to.be.equal(minter.address);
+
+    await contract.setDefaultRoyalty(redeemer.address, updatedRoyaltyBPS);
+
+    response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.be.equal(salePrice.div(20));
+    expect(response[0]).to.be.equal(redeemer.address);
+
+  });
+
+  it("should not allow you to update the royalty information from the wrong sender", async () => {
+    const { contract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+        
+    const salePrice = ethers.constants.WeiPerEther // sell for 1 Eth
+    
+    let response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.be.equal(salePrice.div(10));
+    expect(response[0]).to.be.equal(minter.address);
+
+    await expect(contract.connect(addr2).setDefaultRoyalty(redeemer.address, 500)).to.be.revertedWith("Only the foundation can make this call");
+    
+    response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.be.equal(salePrice.div(10));
+    expect(response[0]).to.be.equal(minter.address);
+
+  });
+
+  it('should support 0 royalties', async function () {
+    const { contract, redeemer, minter } = await deploy()
+    
+    const salePrice = ethers.constants.WeiPerEther // sell for 1 Eth
+    
+    let response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.be.equal(salePrice.div(10));
+    expect(response[0]).to.be.equal(minter.address);
+
+    await contract.setDefaultRoyalty(minter.address, 0);
+
+    response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1].toNumber()).to.be.equal(0);
+    expect(response[0]).to.be.equal(minter.address);
+  });
+  
+  it('should support the correct interfaces', async function () {
+    const { contract, redeemer, minter } = await deploy()
+
+    expect(
+        await contract.supportsInterface(
+            _INTERFACE_ID_ERC165,
+        ),
+        'Error Royalties 165',
+    ).to.be.true;
+    
+    expect(
+        await contract.supportsInterface(
+            _INTERFACE_ID_ROYALTIES_EIP2981,
+        ),
+        'Error Royalties 2981',
+    ).to.be.true;
+
+    expect(
+        await contract.supportsInterface(
+            _INTERFACE_ID_ERC721,
+        ),
+        'Error Royalties 721',
+    ).to.be.true;
+  });
+
   it("Should emit a valid tokenURI in the Mint event params", async function() {
     const { contract } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
@@ -791,11 +888,12 @@ describe("BlankArt", function () {
     const maxTokenSupply = 10000
     const baseTokenUri = arWeaveURI[0]
     const controller = minter.address
+    const royaltyBPS = 1000 //10%
 
-    const unsignedTx = factory.getDeployTransaction(controller, maxTokenSupply, baseTokenUri);
+    const unsignedTx = factory.getDeployTransaction(controller, maxTokenSupply, baseTokenUri, royaltyBPS);
     const tx = await factory.signer.sendTransaction(unsignedTx);
     const receipt = await tx.wait(1)
-    const parsedLog = interface.parseLog(receipt.logs[0])
+    const parsedLog = interface.parseLog(receipt.logs[1])
 
     expect(parsedLog.name).to.equal('Initialized')
     expect(parsedLog.signature).to.equal('Initialized(address,string,uint256,uint256,uint256,bool,bool)')

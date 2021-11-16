@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
+import "./IERC2981.sol";
 
-contract BlankArt is ERC721, EIP712, ERC721URIStorage {
+contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     event Initialized(
         address controller,
         string baseURI,
@@ -25,6 +27,8 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     event TokenUriLocked(uint256 tokenId);
 
     event Minted(uint256 tokenId, address member, string tokenURI);
+
+    event BlankRoyaltySet(address recipient, uint16 bps);
 
     // if a token's URI has been locked or not
     mapping(uint256 => uint256) public tokenURILocked;
@@ -55,10 +59,18 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     // pending withdrawals by account address
     mapping(bytes32 => bool) private voucherClaimed;
 
+    // EIP2981
+    struct RoyaltyInfo {
+        address recipient;
+        uint16 bps;
+    }
+    RoyaltyInfo public blankRoyalty;
+
     constructor(
         address payable _foundationAddress,
         uint256 _maxTokenSupply,
-        string memory baseURI
+        string memory baseURI,
+        uint16 _royaltyBPS
     ) ERC721("BlankArt", "BLANK") EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION) {
         foundationSalePercentage = 50;
         memberMaxMintCount = 5;
@@ -81,6 +93,8 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
             active,
             publicMint
         );
+        //Setup the initial royalty recipient and amount
+        blankRoyalty = RoyaltyInfo(_foundationAddress, _royaltyBPS);
     }
 
     /// @notice Represents a voucher to claim any un-minted NFT (up to memberMaxMintCount), which has not yet been recorded into the blockchain. A signed voucher can be redeemed for real NFTs using the redeemVoucher function.
@@ -331,13 +345,42 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         return ECDSA.recover(digest, voucher.signature);
     }
 
+    /// @notice Called with the sale price to determine how much royalty
+    //          is owed and to whom.
+    /// @param - the tokenId queried for royalty information --Not Utilized, All tokens have the same royalty
+    /// @param salePrice - the sale price of the NFT asset specified by _tokenId
+    /// @return receiver - address of who should be sent the royalty payment
+    /// @return royaltyAmount - the royalty payment amount for _salePrice
+    function royaltyInfo(uint256, uint256 salePrice)
+        external
+        view
+        override(IERC2981)
+        returns (address receiver, uint256 royaltyAmount)
+    {
+        return (
+            blankRoyalty.recipient,
+            (salePrice * blankRoyalty.bps) / 10000
+        );
+    }
+    
+    /// @dev Update the address which receives royalties, and the fee charged
+    /// @param recipient address of who should be sent the royalty payment
+    /// @param bps uint256 amount of fee (1% == 100)
+    function setDefaultRoyalty(address recipient, uint16 bps)
+        public
+        onlyFoundation
+    {
+        blankRoyalty = RoyaltyInfo(recipient, bps);
+        emit BlankRoyaltySet(recipient, bps);
+    }
+
     function supportsInterface(bytes4 interfaceId)
         public
         view
         virtual
-        override(ERC721)
+        override(ERC721, IERC165)
         returns (bool)
     {
-        return ERC721.supportsInterface(interfaceId);
+        return ERC721.supportsInterface(interfaceId) || interfaceId == type(IERC2981).interfaceId;
     }
 }
