@@ -24,7 +24,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
 
     event BaseTokenUriUpdated(string baseTokenURI);
 
-    event TokenUriLocked(uint256 tokenId);
+    event PermanentURI(string _value, uint256 indexed _id); // https://docs.opensea.io/docs/metadata-standards
 
     event Minted(uint256 tokenId, address member, string tokenURI);
 
@@ -186,7 +186,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
         // lock this token's URI from being changed
         tokenURILocked[tokenId] = _baseURIs.length - 1;
 
-        emit TokenUriLocked(tokenId);
+        emit PermanentURI(tokenURI(tokenId), tokenId);
     }
 
     // Updates the mintPrice

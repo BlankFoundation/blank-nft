@@ -289,7 +289,9 @@ describe("BlankArt", function () {
     expect(await redeemerContract.tokenURI(3)).to.equal(arWeaveURI[0] + "3.json");
 
     //Lock one of the tokenURIs
-    await redeemerContract.lockTokenURI(2);
+    expect(await redeemerContract.lockTokenURI(2))
+      .to.emit(contract, 'PermanentURI')
+      .withArgs(arWeaveURI[0] + '2.json', 2)
 
     //Evolve the NFTs
     await contract.addBaseURI(arWeaveURI[1]);
