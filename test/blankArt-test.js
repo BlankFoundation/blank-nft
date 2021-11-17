@@ -269,7 +269,7 @@ describe("BlankArt", function () {
 
     //Evolve the NFTs
     await expect(contract.connect(redeemer).addBaseURI(arWeaveURI[1]))
-      .to.be.revertedWith("Only the foundation can make this call");
+      .to.be.revertedWith("Ownable: caller is not the owner");
   });
 
   it("Should return the correct tokenURIs for both locked and unlocked NFTs", async function() {
@@ -446,7 +446,7 @@ describe("BlankArt", function () {
 
     expect(await contract.foundationAddress()).to.equal(minter.address);
 
-    await expect(contract.connect(redeemer).updateFoundationAddress(minter.address)).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(redeemer).updateFoundationAddress(minter.address)).to.be.revertedWith("Ownable: caller is not the owner");
 
     expect(await contract.foundationAddress()).to.equal(minter.address);
   });
@@ -469,7 +469,7 @@ describe("BlankArt", function () {
 
     expect(await contract.mintPrice()).to.equal(0);
 
-    await expect(contract.connect(addr2).updateMintPrice(price)).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(addr2).updateMintPrice(price)).to.be.revertedWith("Ownable: caller is not the owner");
 
     expect(await contract.mintPrice()).to.equal(0);
   });
@@ -501,7 +501,7 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await expect(contract.connect(addr2).togglePublicMint()).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(addr2).togglePublicMint()).to.be.revertedWith("Ownable: caller is not the owner");
 
     expect(await contract.publicMint()).to.equal(false);
   });
@@ -745,7 +745,7 @@ describe("BlankArt", function () {
 
     expect(await contract.active()).to.equal(true);
 
-    await expect(contract.connect(addr2).toggleActivation()).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(addr2).toggleActivation()).to.be.revertedWith("Ownable: caller is not the owner");
 
     expect(await contract.active()).to.equal(true);
   });
@@ -771,7 +771,7 @@ describe("BlankArt", function () {
 
     expect(await contract.memberMaxMintCount()).to.equal(5);
 
-    await expect(contract.connect(addr2).updateMaxMintCount(10)).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(addr2).updateMaxMintCount(10)).to.be.revertedWith("Ownable: caller is not the owner");
 
     expect(await contract.memberMaxMintCount()).to.equal(5);
   });
@@ -818,7 +818,7 @@ describe("BlankArt", function () {
     expect(response[1]).to.be.equal(salePrice.div(10));
     expect(response[0]).to.be.equal(minter.address);
 
-    await expect(contract.connect(addr2).setDefaultRoyalty(redeemer.address, 500)).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(addr2).setDefaultRoyalty(redeemer.address, 500)).to.be.revertedWith("Ownable: caller is not the owner");
     
     response = await contract.royaltyInfo(1,salePrice);
     expect(response[1]).to.be.equal(salePrice.div(10));
@@ -898,7 +898,7 @@ describe("BlankArt", function () {
     const parsedLog = interface.parseLog(receipt.logs[1])
 
     expect(parsedLog.name).to.equal('Initialized')
-    expect(parsedLog.signature).to.equal('Initialized(address,string,uint256,uint256,uint256,bool,bool)')
+    expect(parsedLog.signature).to.equal('Initialized(address,string,uint256,uint256,bool,bool)')
     expect(parsedLog.args).to.have.property('controller', '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
     expect(parsedLog.args).to.have.property('baseURI', baseTokenUri)
     expect(parsedLog.args.mintPrice).to.equal(0)
@@ -906,4 +906,33 @@ describe("BlankArt", function () {
     expect(parsedLog.args).to.have.property('active', true)
     expect(parsedLog.args).to.have.property('publicMint', false)
   })
+
+  it("should allow the foundation to update the contract owner", async () => {
+    const { contract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.owner()).to.equal(minter.address);
+
+    await contract.transferOwnership(addr2.address);
+
+    expect(await contract.owner()).to.equal(addr2.address);
+
+    //Perform an onlyOwner call
+    await contract.togglePublicMint();
+
+    expect(await contract.publicMint()).to.equal(true);
+
+  });
+
+  it("should not allow a non-owner to update the contract owner", async () => {
+    const { contract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.owner()).to.equal(minter.address);
+
+    await expect(contract.connect(addr2).transferOwnership(addr2.address))
+      .to.be.revertedWith("Ownable: caller is not the owner");
+
+  });
+
 });

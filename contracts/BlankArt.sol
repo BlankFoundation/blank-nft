@@ -118,17 +118,11 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
         super._burn(tokenId);
     }
 
-    // modifier for only allowing the foundation to make a call
-    modifier onlyFoundation() {
-        require(msg.sender == foundationAddress, "Only the foundation can make this call");
-        _;
-    }
-
     function isMember(address account) external view returns (bool) {
         return (balanceOf(account) > 0);
     }
 
-    function addBaseURI(string calldata baseURI) external onlyFoundation {
+    function addBaseURI(string calldata baseURI) external onlyOwner {
         _baseURIs.push(baseURI);
         emit BaseTokenUriUpdated(baseURI);
     }
@@ -166,7 +160,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     }
 
     // Allows the current foundation address to update to something different
-    function updateFoundationAddress(address payable newFoundationAddress) external onlyFoundation {
+    function updateFoundationAddress(address payable newFoundationAddress) external onlyOwner {
         foundationAddress = newFoundationAddress;
 
         emit FoundationAddressUpdated(newFoundationAddress);
@@ -185,24 +179,24 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     }
 
     // Updates the mintPrice
-    function updateMintPrice(uint256 price) external onlyFoundation {
+    function updateMintPrice(uint256 price) external onlyOwner {
         // Update the mintPrice
         mintPrice = price;
     }
 
     // Updates the memberMaxMintCount
-    function updateMaxMintCount(uint8 _maxMint) external onlyFoundation {
+    function updateMaxMintCount(uint8 _maxMint) external onlyOwner {
         require(_maxMint > 0, "Max mint cannot be zero");
         memberMaxMintCount = _maxMint;
     }
 
     // Toggle the value of publicMint
-    function togglePublicMint() external onlyFoundation {
+    function togglePublicMint() external onlyOwner {
         publicMint = !publicMint;
     }
 
     // Pause minting
-    function toggleActivation() external onlyFoundation {
+    function toggleActivation() external onlyOwner {
         active = !active;
     }
 
@@ -287,7 +281,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     }
 
     /// @notice Transfers all pending withdrawal balance to the caller. Reverts if the caller is not an authorized minter.
-    function withdraw() public onlyFoundation {
+    function withdraw() public onlyOwner {
         // IMPORTANT: casting msg.sender to a payable address is only safe if ALL members of the minter role are payable addresses.
         address payable receiver = payable(msg.sender);
 
@@ -298,7 +292,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     }
 
     /// @notice Retuns the amount of Ether available to the caller to withdraw.
-    function availableToWithdraw() public view onlyFoundation returns (uint256) {
+    function availableToWithdraw() public view onlyOwner returns (uint256) {
         return pendingWithdrawals[msg.sender];
     }
 
@@ -363,7 +357,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     /// @param bps uint256 amount of fee (1% == 100)
     function setDefaultRoyalty(address recipient, uint16 bps)
         public
-        onlyFoundation
+        onlyOwner
     {
         blankRoyalty = RoyaltyInfo(recipient, bps);
         emit BlankRoyaltySet(recipient, bps);
