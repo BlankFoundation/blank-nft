@@ -65,7 +65,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     // EIP2981
     struct RoyaltyInfo {
         address recipient;
-        uint16 bps;
+        uint24 bps;
     }
     RoyaltyInfo public blankRoyalty;
 
