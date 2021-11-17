@@ -11,6 +11,7 @@ import "./IERC2981.sol";
 contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     event Initialized(
         address controller,
+        address signer,
         string baseURI,
         uint256 mintPrice,
         uint256 maxTokenSupply,
@@ -20,6 +21,9 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
 
     // An event whenever the foundation address is updated
     event FoundationAddressUpdated(address foundationAddress);
+
+    // An event whenever the voucher signer address is updated
+    event VoucherSignersUpdated(address foundationAddress, bool active);
 
     event BaseTokenUriUpdated(string baseTokenURI);
 
@@ -35,6 +39,8 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     string private constant SIGNING_DOMAIN = "BlankNFT";
     // signature version
     string private constant SIGNATURE_VERSION = "1";
+    // address which signs the voucher
+    mapping(address => bool) _voucherSigners;
     // Array of _baseURIs
     string[] private _baseURIs;
     // gets incremented to placehold for tokens not minted yet
@@ -65,12 +71,14 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
 
     constructor(
         address payable _foundationAddress,
+        address _signer,
         uint256 _maxTokenSupply,
         string memory baseURI,
         uint16 _royaltyBPS
     ) ERC721("BlankArt", "BLANK") EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION) {
         memberMaxMintCount = 5;
         foundationAddress = _foundationAddress;
+        _voucherSigners[_signer] = true;
         maxTokenSupply = _maxTokenSupply;
         require(maxTokenSupply > 0);
         tokenIndex = 1;
@@ -82,6 +90,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
         active = true;
         emit Initialized(
             foundationAddress,
+            _signer,
             baseURI,
             mintPrice,
             maxTokenSupply,
@@ -166,6 +175,20 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
         emit FoundationAddressUpdated(newFoundationAddress);
     }
 
+    // Allows the voucher signing address
+    function addVoucherSigner(address newVoucherSigner) external onlyOwner {
+        _voucherSigners[newVoucherSigner] = true;
+
+        emit VoucherSignersUpdated(newVoucherSigner, true);
+    }
+
+    // Disallows a voucher signing address
+    function removeVoucherSigner(address oldVoucherSigner) external onlyOwner {
+        _voucherSigners[oldVoucherSigner] = false;
+
+        emit VoucherSignersUpdated(oldVoucherSigner, false);
+    }
+
     // Locks a token's URI from being updated. Only callable by the token owner.
     function lockTokenURI(uint256 tokenId) external {
         // ensure that this token exists
@@ -225,8 +248,8 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
         // make sure voucher has not expired.
         require(block.timestamp <= voucher.expiration, "Voucher has expired");
 
-        // make sure that the signer is the foundation address
-        require(payable(signer) == foundationAddress, "Signature invalid or unauthorized");
+        // make sure that the signer is the designated signer
+        require(_voucherSigners[signer], "Signature invalid or unauthorized");
 
         require(
             balanceOf(voucher.redeemerAddress) + amount <= memberMaxMintCount,
@@ -250,7 +273,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
             tokenIds[num] = tokenId;
         }
         // record payment to signer's withdrawal balance
-        pendingWithdrawals[signer] += msg.value;
+        pendingWithdrawals[foundationAddress] += msg.value;
         voucherClaimed[_hash(voucher)] = true;
 
         return tokenIds;
