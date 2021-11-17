@@ -903,7 +903,6 @@ describe("BlankArt", function () {
     expect(parsedLog.args).to.have.property('baseURI', baseTokenUri)
     expect(parsedLog.args.mintPrice).to.equal(0)
     expect(parsedLog.args.maxTokenSupply).to.equal(maxTokenSupply)
-    expect(parsedLog.args.foundationSalePercentage).to.equal(50)
     expect(parsedLog.args).to.have.property('active', true)
     expect(parsedLog.args).to.have.property('publicMint', false)
   })

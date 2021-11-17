@@ -14,7 +14,6 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
         string baseURI,
         uint256 mintPrice,
         uint256 maxTokenSupply,
-        uint256 foundationSalePercentage,
         bool active,
         bool publicMint
     );
@@ -38,8 +37,6 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     string private constant SIGNATURE_VERSION = "1";
     // Array of _baseURIs
     string[] private _baseURIs;
-    // the percentage of sale that the foundation gets on secondary sales
-    uint256 public foundationSalePercentage;
     // gets incremented to placehold for tokens not minted yet
     uint256 public maxTokenSupply;
     // cost to mint during the public sale
@@ -72,7 +69,6 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
         string memory baseURI,
         uint16 _royaltyBPS
     ) ERC721("BlankArt", "BLANK") EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION) {
-        foundationSalePercentage = 50;
         memberMaxMintCount = 5;
         foundationAddress = _foundationAddress;
         maxTokenSupply = _maxTokenSupply;
@@ -89,7 +85,6 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
             baseURI,
             mintPrice,
             maxTokenSupply,
-            foundationSalePercentage,
             active,
             publicMint
         );
