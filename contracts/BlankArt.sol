@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
+import "./IERC2981.sol";
 
-contract BlankArt is ERC721, EIP712, ERC721URIStorage {
+contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     event Initialized(
         address controller,
+        address signer,
         string baseURI,
         uint256 mintPrice,
         uint256 maxTokenSupply,
-        uint256 foundationSalePercentage,
         bool active,
         bool publicMint
     );
@@ -20,11 +22,16 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     // An event whenever the foundation address is updated
     event FoundationAddressUpdated(address foundationAddress);
 
+    // An event whenever the voucher signer address is updated
+    event VoucherSignersUpdated(address foundationAddress, bool active);
+
     event BaseTokenUriUpdated(string baseTokenURI);
 
-    event TokenUriLocked(uint256 tokenId);
+    event PermanentURI(string _value, uint256 indexed _id); // https://docs.opensea.io/docs/metadata-standards
 
     event Minted(uint256 tokenId, address member, string tokenURI);
+
+    event BlankRoyaltySet(address recipient, uint16 bps);
 
     // if a token's URI has been locked or not
     mapping(uint256 => uint256) public tokenURILocked;
@@ -32,10 +39,10 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     string private constant SIGNING_DOMAIN = "BlankNFT";
     // signature version
     string private constant SIGNATURE_VERSION = "1";
+    // address which signs the voucher
+    mapping(address => bool) _voucherSigners;
     // Array of _baseURIs
     string[] private _baseURIs;
-    // the percentage of sale that the foundation gets on secondary sales
-    uint256 public foundationSalePercentage;
     // gets incremented to placehold for tokens not minted yet
     uint256 public maxTokenSupply;
     // cost to mint during the public sale
@@ -55,14 +62,23 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     // pending withdrawals by account address
     mapping(bytes32 => bool) private voucherClaimed;
 
+    // EIP2981
+    struct RoyaltyInfo {
+        address recipient;
+        uint24 bps;
+    }
+    RoyaltyInfo public blankRoyalty;
+
     constructor(
         address payable _foundationAddress,
+        address _signer,
         uint256 _maxTokenSupply,
-        string memory baseURI
+        string memory baseURI,
+        uint16 _royaltyBPS
     ) ERC721("BlankArt", "BLANK") EIP712(SIGNING_DOMAIN, SIGNATURE_VERSION) {
-        foundationSalePercentage = 50;
         memberMaxMintCount = 5;
         foundationAddress = _foundationAddress;
+        _voucherSigners[_signer] = true;
         maxTokenSupply = _maxTokenSupply;
         require(maxTokenSupply > 0);
         tokenIndex = 1;
@@ -74,13 +90,15 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         active = true;
         emit Initialized(
             foundationAddress,
+            _signer,
             baseURI,
             mintPrice,
             maxTokenSupply,
-            foundationSalePercentage,
             active,
             publicMint
         );
+        //Setup the initial royalty recipient and amount
+        blankRoyalty = RoyaltyInfo(_foundationAddress, _royaltyBPS);
     }
 
     /// @notice Represents a voucher to claim any un-minted NFT (up to memberMaxMintCount), which has not yet been recorded into the blockchain. A signed voucher can be redeemed for real NFTs using the redeemVoucher function.
@@ -109,17 +127,11 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         super._burn(tokenId);
     }
 
-    // modifier for only allowing the foundation to make a call
-    modifier onlyFoundation() {
-        require(msg.sender == foundationAddress, "Only the foundation can make this call");
-        _;
-    }
-
     function isMember(address account) external view returns (bool) {
         return (balanceOf(account) > 0);
     }
 
-    function addBaseURI(string calldata baseURI) external onlyFoundation {
+    function addBaseURI(string calldata baseURI) external onlyOwner {
         _baseURIs.push(baseURI);
         emit BaseTokenUriUpdated(baseURI);
     }
@@ -157,10 +169,24 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     }
 
     // Allows the current foundation address to update to something different
-    function updateFoundationAddress(address payable newFoundationAddress) external onlyFoundation {
+    function updateFoundationAddress(address payable newFoundationAddress) external onlyOwner {
         foundationAddress = newFoundationAddress;
 
         emit FoundationAddressUpdated(newFoundationAddress);
+    }
+
+    // Allows the voucher signing address
+    function addVoucherSigner(address newVoucherSigner) external onlyOwner {
+        _voucherSigners[newVoucherSigner] = true;
+
+        emit VoucherSignersUpdated(newVoucherSigner, true);
+    }
+
+    // Disallows a voucher signing address
+    function removeVoucherSigner(address oldVoucherSigner) external onlyOwner {
+        _voucherSigners[oldVoucherSigner] = false;
+
+        emit VoucherSignersUpdated(oldVoucherSigner, false);
     }
 
     // Locks a token's URI from being updated. Only callable by the token owner.
@@ -172,28 +198,28 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         // lock this token's URI from being changed
         tokenURILocked[tokenId] = _baseURIs.length - 1;
 
-        emit TokenUriLocked(tokenId);
+        emit PermanentURI(tokenURI(tokenId), tokenId);
     }
 
     // Updates the mintPrice
-    function updateMintPrice(uint256 price) external onlyFoundation {
+    function updateMintPrice(uint256 price) external onlyOwner {
         // Update the mintPrice
         mintPrice = price;
     }
 
     // Updates the memberMaxMintCount
-    function updateMaxMintCount(uint8 _maxMint) external onlyFoundation {
+    function updateMaxMintCount(uint8 _maxMint) external onlyOwner {
         require(_maxMint > 0, "Max mint cannot be zero");
         memberMaxMintCount = _maxMint;
     }
 
     // Toggle the value of publicMint
-    function togglePublicMint() external onlyFoundation {
+    function togglePublicMint() external onlyOwner {
         publicMint = !publicMint;
     }
 
     // Pause minting
-    function toggleActivation() external onlyFoundation {
+    function toggleActivation() external onlyOwner {
         active = !active;
     }
 
@@ -222,8 +248,8 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         // make sure voucher has not expired.
         require(block.timestamp <= voucher.expiration, "Voucher has expired");
 
-        // make sure that the signer is the foundation address
-        require(payable(signer) == foundationAddress, "Signature invalid or unauthorized");
+        // make sure that the signer is the designated signer
+        require(_voucherSigners[signer], "Signature invalid or unauthorized");
 
         require(
             balanceOf(voucher.redeemerAddress) + amount <= memberMaxMintCount,
@@ -247,7 +273,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
             tokenIds[num] = tokenId;
         }
         // record payment to signer's withdrawal balance
-        pendingWithdrawals[signer] += msg.value;
+        pendingWithdrawals[foundationAddress] += msg.value;
         voucherClaimed[_hash(voucher)] = true;
 
         return tokenIds;
@@ -278,7 +304,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     }
 
     /// @notice Transfers all pending withdrawal balance to the caller. Reverts if the caller is not an authorized minter.
-    function withdraw() public onlyFoundation {
+    function withdraw() public onlyOwner {
         // IMPORTANT: casting msg.sender to a payable address is only safe if ALL members of the minter role are payable addresses.
         address payable receiver = payable(msg.sender);
 
@@ -289,7 +315,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
     }
 
     /// @notice Retuns the amount of Ether available to the caller to withdraw.
-    function availableToWithdraw() public view onlyFoundation returns (uint256) {
+    function availableToWithdraw() public view onlyOwner returns (uint256) {
         return pendingWithdrawals[msg.sender];
     }
 
@@ -331,13 +357,42 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage {
         return ECDSA.recover(digest, voucher.signature);
     }
 
+    /// @notice Called with the sale price to determine how much royalty
+    //          is owed and to whom.
+    /// @param - the tokenId queried for royalty information --Not Utilized, All tokens have the same royalty
+    /// @param salePrice - the sale price of the NFT asset specified by _tokenId
+    /// @return receiver - address of who should be sent the royalty payment
+    /// @return royaltyAmount - the royalty payment amount for _salePrice
+    function royaltyInfo(uint256, uint256 salePrice)
+        external
+        view
+        override(IERC2981)
+        returns (address receiver, uint256 royaltyAmount)
+    {
+        return (
+            blankRoyalty.recipient,
+            (salePrice * blankRoyalty.bps) / 10000
+        );
+    }
+    
+    /// @dev Update the address which receives royalties, and the fee charged
+    /// @param recipient address of who should be sent the royalty payment
+    /// @param bps uint256 amount of fee (1% == 100)
+    function setDefaultRoyalty(address recipient, uint16 bps)
+        public
+        onlyOwner
+    {
+        blankRoyalty = RoyaltyInfo(recipient, bps);
+        emit BlankRoyaltySet(recipient, bps);
+    }
+
     function supportsInterface(bytes4 interfaceId)
         public
         view
         virtual
-        override(ERC721)
+        override(ERC721, IERC165)
         returns (bool)
     {
-        return ERC721.supportsInterface(interfaceId);
+        return ERC721.supportsInterface(interfaceId) || interfaceId == type(IERC2981).interfaceId;
     }
 }

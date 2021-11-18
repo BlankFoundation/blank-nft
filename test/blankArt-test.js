@@ -2,6 +2,10 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 const { LazyMinter } = require('../lib');
 
+const _INTERFACE_ID_ERC165 = '0x01ffc9a7';
+const _INTERFACE_ID_ROYALTIES_EIP2981 = '0x2a55205a';
+const _INTERFACE_ID_ERC721 = '0x80ac58cd';
+
 describe("BlankArt", function () {
   let blankArt;
 
@@ -10,16 +14,18 @@ describe("BlankArt", function () {
   arWeaveURI.push("https://arweave.net/4usQHuUrIKOMahMjSlgYsPKjOp2wPSP8Z8Qs6NmcT_k/");
   arWeaveURI.push("https://arweave.net/hash2/");
 
+  const royaltyBPS = 1000; //10%.
+
   const voucherExpiration = 86400; //Voucher expires in 24 hours.
   const expiration = (Math.floor( Date.now() / 1000 )+voucherExpiration);
 
   async function deploy(maxTokenSupply) {
-      const [minter, redeemer, _] = await ethers.getSigners()
+      const [minter, redeemer, voucherSigner] = await ethers.getSigners()
 
       let factory = await ethers.getContractFactory("BlankArt")
       if(isNaN(maxTokenSupply))
         maxTokenSupply = 10000
-      const contract = await factory.deploy(minter.address, maxTokenSupply, arWeaveURI[0])
+      const contract = await factory.deploy(minter.address, voucherSigner.address, maxTokenSupply, arWeaveURI[0], royaltyBPS)
 
       // the redeemerContract is an instance of the contract that's wired up to the redeemer's signing key
       const redeemerFactory = factory.connect(redeemer)
@@ -30,13 +36,14 @@ describe("BlankArt", function () {
         redeemer,
         contract,
         redeemerContract,
+        voucherSigner,
     }
   }
 
   it("Should redeem one free Blank NFT from a signed voucher", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
 
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration);
 
@@ -47,9 +54,9 @@ describe("BlankArt", function () {
   });
 
   it("Should redeem 5 free Blank NFTs from a signed voucher", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await expect(redeemerContract.redeemVoucher(5, voucher))
@@ -60,9 +67,9 @@ describe("BlankArt", function () {
   });
 
   it("Should redeem 10 free Blank NFTs from a signed voucher with a limit of 10", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration, 0, 10)
 
     // Set the maxMint count to 10.
@@ -75,9 +82,9 @@ describe("BlankArt", function () {
   });
 
   it("Should allow an address to redeem multiple distinct vouchers, within the maxMint limit", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await expect(redeemerContract.redeemVoucher(2, voucher))
@@ -94,9 +101,9 @@ describe("BlankArt", function () {
   });
 
   it("Should allow an address to redeem multiple distinct vouchers, within the maxMint limit", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     // Set the maxMint count to 10.
@@ -116,9 +123,9 @@ describe("BlankArt", function () {
   });
 
   it("Should error on an attmpt to redeem more Blank NFTs than the voucher allows", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration, 0, 3)
 
     await expect(redeemerContract.redeemVoucher(5, voucher))
@@ -126,9 +133,9 @@ describe("BlankArt", function () {
   });
 
   it("Should error on an attempt to mint more than 5 Blank NFTs from a signed voucher", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     const amount = 6;
@@ -137,9 +144,9 @@ describe("BlankArt", function () {
   });
 
   it("Should error on an attempt to redeem twice for more than max amount total", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await expect(redeemerContract.redeemVoucher(2, voucher))
@@ -153,9 +160,9 @@ describe("BlankArt", function () {
   });
 
   it("Should error on an attempt to redeem twice using the same voucher, even if total is below the max mint amount", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await expect(redeemerContract.redeemVoucher(2, voucher))
@@ -169,9 +176,9 @@ describe("BlankArt", function () {
   });
 
   it("Should error on an attempt to redeem a voucher while redemption is paused", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
 
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration);
 
@@ -183,10 +190,10 @@ describe("BlankArt", function () {
   });
 
   it("Should error on an attempt to redeem a voucher from the wrong address", async function() {
-    const { contract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await expect(contract.connect(addr2).redeemVoucher(1, voucher))
@@ -194,10 +201,10 @@ describe("BlankArt", function () {
   });
 
   it("Should not allow a token to be locked by the Foundation address", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
     await ethers.getSigners()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await expect(redeemerContract.redeemVoucher(3, voucher))
@@ -212,10 +219,10 @@ describe("BlankArt", function () {
   });
 
   it("Should not allow a token to be locked by another address", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
     const [_, __, addr2] = await ethers.getSigners()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await expect(redeemerContract.redeemVoucher(3, voucher))
@@ -230,9 +237,9 @@ describe("BlankArt", function () {
   });
 
   it("Should allow the Foundation to evolve the NFTs", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await expect(redeemerContract.redeemVoucher(3, voucher))
@@ -250,9 +257,9 @@ describe("BlankArt", function () {
   });
 
   it("Should not allow an address other than the Foundation to evolve the NFTs", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await expect(redeemerContract.redeemVoucher(3, voucher))
@@ -263,13 +270,13 @@ describe("BlankArt", function () {
 
     //Evolve the NFTs
     await expect(contract.connect(redeemer).addBaseURI(arWeaveURI[1]))
-      .to.be.revertedWith("Only the foundation can make this call");
+      .to.be.revertedWith("Ownable: caller is not the owner");
   });
 
   it("Should return the correct tokenURIs for both locked and unlocked NFTs", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await expect(redeemerContract.redeemVoucher(3, voucher))
@@ -283,7 +290,9 @@ describe("BlankArt", function () {
     expect(await redeemerContract.tokenURI(3)).to.equal(arWeaveURI[0] + "3.json");
 
     //Lock one of the tokenURIs
-    await redeemerContract.lockTokenURI(2);
+    expect(await redeemerContract.lockTokenURI(2))
+      .to.emit(contract, 'PermanentURI')
+      .withArgs(arWeaveURI[0] + '2.json', 2)
 
     //Evolve the NFTs
     await contract.addBaseURI(arWeaveURI[1]);
@@ -300,11 +309,11 @@ describe("BlankArt", function () {
   });
 
   it("should allow you to check membership if an address has minted", async () => {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
     expect(await contract.isMember(redeemer.address)).to.equal(false);
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration)
 
     await redeemerContract.redeemVoucher(1, voucher)
@@ -355,9 +364,9 @@ describe("BlankArt", function () {
   });
 
   it("Should fail to redeem an NFT voucher that's expired", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
 
     let expired = (Math.floor( Date.now() / 1000 )-1);
     const voucher = await lazyMinter.createVoucher(redeemer.address, expired);
@@ -367,9 +376,9 @@ describe("BlankArt", function () {
   });
 
   it("Should fail to redeem if payment is < minPrice", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const minPrice = ethers.constants.WeiPerEther // charge 1 Eth
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration, minPrice)
 
@@ -379,9 +388,9 @@ describe("BlankArt", function () {
   })
 
   it("Should make payments available to minter for withdrawal", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const minPrice = ethers.constants.WeiPerEther // charge 1 Eth
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration, minPrice)
 
@@ -401,9 +410,9 @@ describe("BlankArt", function () {
   })
 
   it("Should withdraw for the correct amount of payment", async function() {
-    const { contract, redeemerContract, redeemer, minter } = await deploy()
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
 
-    const lazyMinter = new LazyMinter({ contract, signer: minter })
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
     const minPrice = ethers.constants.WeiPerEther // charge 1 Eth
     const voucher = await lazyMinter.createVoucher(redeemer.address, expiration, minPrice)
 
@@ -438,7 +447,7 @@ describe("BlankArt", function () {
 
     expect(await contract.foundationAddress()).to.equal(minter.address);
 
-    await expect(contract.connect(redeemer).updateFoundationAddress(minter.address)).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(redeemer).updateFoundationAddress(minter.address)).to.be.revertedWith("Ownable: caller is not the owner");
 
     expect(await contract.foundationAddress()).to.equal(minter.address);
   });
@@ -461,7 +470,7 @@ describe("BlankArt", function () {
 
     expect(await contract.mintPrice()).to.equal(0);
 
-    await expect(contract.connect(addr2).updateMintPrice(price)).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(addr2).updateMintPrice(price)).to.be.revertedWith("Ownable: caller is not the owner");
 
     expect(await contract.mintPrice()).to.equal(0);
   });
@@ -493,7 +502,7 @@ describe("BlankArt", function () {
 
     expect(await contract.publicMint()).to.equal(false);
 
-    await expect(contract.connect(addr2).togglePublicMint()).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(addr2).togglePublicMint()).to.be.revertedWith("Ownable: caller is not the owner");
 
     expect(await contract.publicMint()).to.equal(false);
   });
@@ -737,7 +746,7 @@ describe("BlankArt", function () {
 
     expect(await contract.active()).to.equal(true);
 
-    await expect(contract.connect(addr2).toggleActivation()).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(addr2).toggleActivation()).to.be.revertedWith("Ownable: caller is not the owner");
 
     expect(await contract.active()).to.equal(true);
   });
@@ -763,9 +772,100 @@ describe("BlankArt", function () {
 
     expect(await contract.memberMaxMintCount()).to.equal(5);
 
-    await expect(contract.connect(addr2).updateMaxMintCount(10)).to.be.revertedWith("Only the foundation can make this call");
+    await expect(contract.connect(addr2).updateMaxMintCount(10)).to.be.revertedWith("Ownable: caller is not the owner");
 
     expect(await contract.memberMaxMintCount()).to.equal(5);
+  });
+
+  it("should return the correct royaltyInfo", async () => {
+    const { contract, redeemer, minter } = await deploy()
+
+    const salePrice = ethers.constants.WeiPerEther // sell for 1 Eth
+
+    let response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.equal(salePrice.div(10));
+    expect(response[0]).to.equal(minter.address);
+
+    response = await contract.royaltyInfo(1,salePrice.div(10));
+    expect(response[1]).to.equal(salePrice.div(100));
+    expect(response[0]).to.equal(minter.address);
+  });
+
+  it("should allow the foundation to update the royalty information", async () => {
+    const { contract, redeemer, minter } = await deploy()
+
+    const salePrice = ethers.constants.WeiPerEther // sell for 1 Eth
+    const updatedRoyaltyBPS = 500 // 5%
+    
+    let response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.be.equal(salePrice.div(10));
+    expect(response[0]).to.be.equal(minter.address);
+
+    await contract.setDefaultRoyalty(redeemer.address, updatedRoyaltyBPS);
+
+    response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.be.equal(salePrice.div(20));
+    expect(response[0]).to.be.equal(redeemer.address);
+
+  });
+
+  it("should not allow you to update the royalty information from the wrong sender", async () => {
+    const { contract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+        
+    const salePrice = ethers.constants.WeiPerEther // sell for 1 Eth
+    
+    let response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.be.equal(salePrice.div(10));
+    expect(response[0]).to.be.equal(minter.address);
+
+    await expect(contract.connect(addr2).setDefaultRoyalty(redeemer.address, 500)).to.be.revertedWith("Ownable: caller is not the owner");
+    
+    response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.be.equal(salePrice.div(10));
+    expect(response[0]).to.be.equal(minter.address);
+
+  });
+
+  it('should support 0 royalties', async function () {
+    const { contract, redeemer, minter } = await deploy()
+    
+    const salePrice = ethers.constants.WeiPerEther // sell for 1 Eth
+    
+    let response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1]).to.be.equal(salePrice.div(10));
+    expect(response[0]).to.be.equal(minter.address);
+
+    await contract.setDefaultRoyalty(minter.address, 0);
+
+    response = await contract.royaltyInfo(1,salePrice);
+    expect(response[1].toNumber()).to.be.equal(0);
+    expect(response[0]).to.be.equal(minter.address);
+  });
+  
+  it('should support the correct interfaces', async function () {
+    const { contract, redeemer, minter } = await deploy()
+
+    expect(
+        await contract.supportsInterface(
+            _INTERFACE_ID_ERC165,
+        ),
+        'Error Royalties 165',
+    ).to.be.true;
+    
+    expect(
+        await contract.supportsInterface(
+            _INTERFACE_ID_ROYALTIES_EIP2981,
+        ),
+        'Error Royalties 2981',
+    ).to.be.true;
+
+    expect(
+        await contract.supportsInterface(
+            _INTERFACE_ID_ERC721,
+        ),
+        'Error Royalties 721',
+    ).to.be.true;
   });
 
   it("Should emit a valid tokenURI in the Mint event params", async function() {
@@ -784,27 +884,111 @@ describe("BlankArt", function () {
   });
 
   it("Should emit Initialized event during deploy", async function() {
-    const [minter, redeemer, _] = await ethers.getSigners()
+    const [minter, redeemer, voucherSigner] = await ethers.getSigners()
     let factory = await ethers.getContractFactory("BlankArt")
     let interface = factory.interface
 
     const maxTokenSupply = 10000
     const baseTokenUri = arWeaveURI[0]
     const controller = minter.address
+    const royaltyBPS = 1000 //10%
 
-    const unsignedTx = factory.getDeployTransaction(controller, maxTokenSupply, baseTokenUri);
+    const unsignedTx = factory.getDeployTransaction(controller, voucherSigner.address, maxTokenSupply, baseTokenUri, royaltyBPS);
     const tx = await factory.signer.sendTransaction(unsignedTx);
     const receipt = await tx.wait(1)
-    const parsedLog = interface.parseLog(receipt.logs[0])
+    const parsedLog = interface.parseLog(receipt.logs[1])
 
     expect(parsedLog.name).to.equal('Initialized')
-    expect(parsedLog.signature).to.equal('Initialized(address,string,uint256,uint256,uint256,bool,bool)')
+    expect(parsedLog.signature).to.equal('Initialized(address,address,string,uint256,uint256,bool,bool)')
     expect(parsedLog.args).to.have.property('controller', '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266')
+    expect(parsedLog.args).to.have.property('signer', voucherSigner.address)
     expect(parsedLog.args).to.have.property('baseURI', baseTokenUri)
     expect(parsedLog.args.mintPrice).to.equal(0)
     expect(parsedLog.args.maxTokenSupply).to.equal(maxTokenSupply)
-    expect(parsedLog.args.foundationSalePercentage).to.equal(50)
     expect(parsedLog.args).to.have.property('active', true)
     expect(parsedLog.args).to.have.property('publicMint', false)
   })
+
+  it("should allow the foundation to update the contract owner", async () => {
+    const { contract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.owner()).to.equal(minter.address);
+
+    await contract.transferOwnership(addr2.address);
+
+    expect(await contract.owner()).to.equal(addr2.address);
+
+    //Perform an onlyOwner call as the new owner
+    await contract.connect(addr2).togglePublicMint();
+
+    expect(await contract.publicMint()).to.equal(true);
+
+  });
+
+  it("should not allow a non-owner to update the contract owner", async () => {
+    const { contract, redeemer, minter } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    expect(await contract.owner()).to.equal(minter.address);
+
+    await expect(contract.connect(addr2).transferOwnership(addr2.address))
+      .to.be.revertedWith("Ownable: caller is not the owner");
+
+  });
+
+  it("should allow you to add a voucher signer address", async () => {
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    await expect(contract.addVoucherSigner(addr2.address))
+      .to.emit(contract, 'VoucherSignersUpdated')
+      .withArgs(addr2.address, true);
+
+    // Create a voucher with the new voucher signer
+    const lazyMinter = new LazyMinter({ contract, signer: addr2 })
+
+    const voucher = await lazyMinter.createVoucher(redeemer.address, expiration);
+
+    // Attempt to mint with a voucher with the new signer
+    await expect(redeemerContract.redeemVoucher(1, voucher))
+      .to.emit(contract, 'Transfer')  // transfer from null address to minter
+      .to.emit(contract, 'Minted')
+      .withArgs(1, redeemer.address, arWeaveURI[0] + '1.json');
+
+  });
+
+  it("should not allow you to update the voucher signer address from the wrong sender", async () => {
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    await expect(contract.connect(redeemer).addVoucherSigner(addr2.address)).to.be.revertedWith("Ownable: caller is not the owner");
+
+  });
+
+  it("should allow you to remove a voucher signer address", async () => {
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
+    const [_, __, addr2] = await ethers.getSigners()
+
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
+
+    const voucher = await lazyMinter.createVoucher(redeemer.address, expiration);
+
+    // Remove the signer for the generated voucher
+    await expect(contract.removeVoucherSigner(voucherSigner.address))
+      .to.emit(contract, 'VoucherSignersUpdated')
+      .withArgs(voucherSigner.address, false);
+
+    // Attempt to mint with a voucher with an invalid signer
+    await expect(redeemerContract.redeemVoucher(1, voucher)).to.be.revertedWith("Signature invalid or unauthorized");
+
+  });
+
+  it("should not allow you to remove the voucher signer address from the wrong sender", async () => {
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
+    await ethers.getSigners()
+
+    await expect(contract.connect(redeemer).removeVoucherSigner(minter.address)).to.be.revertedWith("Ownable: caller is not the owner");
+  });
+
 });
