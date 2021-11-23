@@ -304,7 +304,7 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
     }
 
     /// @notice Transfers all pending withdrawal balance to the caller. Reverts if the caller is not an authorized minter.
-    function withdraw() public onlyOwner {
+    function withdraw() public {
         // IMPORTANT: casting msg.sender to a payable address is only safe if ALL members of the minter role are payable addresses.
         address payable receiver = payable(msg.sender);
 
@@ -314,8 +314,8 @@ contract BlankArt is ERC721, EIP712, ERC721URIStorage, Ownable, IERC2981 {
         receiver.transfer(amount);
     }
 
-    /// @notice Retuns the amount of Ether available to the caller to withdraw.
-    function availableToWithdraw() public view onlyOwner returns (uint256) {
+    /// @notice Returns the amount of Ether available to the caller to withdraw.
+    function availableToWithdraw() public view returns (uint256) {
         return pendingWithdrawals[msg.sender];
     }
 
