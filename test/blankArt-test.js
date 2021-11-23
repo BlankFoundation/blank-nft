@@ -429,7 +429,31 @@ describe("BlankArt", function () {
 
     // minter should now have zero available
     expect(await contract.availableToWithdraw()).to.equal(0)
-  })
+  });
+
+  it("Should withdraw if the foundationAddress and owner are different", async function() {
+    const { contract, redeemerContract, redeemer, minter, voucherSigner } = await deploy()
+
+    const lazyMinter = new LazyMinter({ contract, signer: voucherSigner })
+    const minPrice = ethers.constants.WeiPerEther // charge 1 Eth
+    const voucher = await lazyMinter.createVoucher(redeemer.address, expiration, minPrice)
+
+    await contract.updateFoundationAddress(redeemer.address);
+
+    // the payment should be sent from the redeemer's account to the contract address
+    await expect(await redeemerContract.redeemVoucher(5, voucher, { value: minPrice.mul(5) }))
+      .to.changeEtherBalances([redeemer, contract], [minPrice.mul(-5), minPrice.mul(5)])
+
+    // redeemer should have funds available to withdraw
+    expect(await redeemerContract.availableToWithdraw()).to.equal(minPrice.mul(5))
+
+    // withdrawal should increase minter's balance
+    await expect(await redeemerContract.withdraw())
+      .to.changeEtherBalance(redeemer, minPrice.mul(5))
+
+    // redeemer should now have zero available
+    expect(await redeemerContract.availableToWithdraw()).to.equal(0)
+  });
 
   it("should allow you to update the foundation address", async () => {
     const { contract, redeemer, minter } = await deploy()
