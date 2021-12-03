@@ -4,6 +4,7 @@ require('hardhat-abi-exporter');
 require('hardhat-gas-reporter');
 require('@typechain/hardhat');
 require('@nomiclabs/hardhat-ethers');
+require('@nomiclabs/hardhat-etherscan');
 require("hardhat-tracer");
 
 // This is a sample Hardhat task. To learn how to create your own go to
@@ -31,15 +32,15 @@ module.exports = {
   solidity: {
     compilers: [
       {
-        version: '0.8.4',
+        version: '0.8.9',
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200,
+            runs: 100,
           },
           outputSelection: {
-            '*': {
-              '*': ['storageLayout'],
+            '': {
+              '': ['*'],
             },
           },
         },
@@ -59,7 +60,13 @@ module.exports = {
         interval: 30000,
       },
       hardfork: 'london',
+    },
+    mainnet: {
+      url: "https://mainnet.infura.io/v3/<>"
     }
+  },
+  etherscan: {
+    apiKey: "<>"
   },
   typechain: {
     outDir: 'build/types',
